@@ -13,8 +13,9 @@ from compare_tumor.data_functions import (
     get_cecum_and_ascending_mz_values,
     get_linear_values,
     get_dropdown_options,
-    get_q05_mz_forest_values
-)
+    get_q05_mz_forest_values,
+    get_all_columns_data
+    )
 
 region = [
     "cecum",
@@ -29,43 +30,42 @@ region = [
 
 tabs_mz = dcc.Tabs(
     [
-        dcc.Tab(
-            label="Negative ions",
-            value="mz-h-tab",
-            children=[
-                dbc.Row(
-                    [
-                        dbc.Col(
-                            [
-                                html.Label(
-                                    "Select Compound:",
-                                    id="mz-h-section",
-                                    className="select-label",
-                                ),
-                                dcc.Dropdown(
-                                    id="compound-dropdown",
-                                    options=[
-                                        {"label": mz, "value": mz}
-                                        for mz in get_mz_values("ascending")
-                                    ],
-
-                                    placeholder="Select Mz Value",
-                                    searchable=True,
-                                    multi=False,
-                                    style={"width": "100%"},
-                                    className="select-input",
-                                    value=get_mz_values("ascending")[0],
-                                ),
-                                html.Div(
-                                    id="selected-mz-h-value",
-                                    className="select-label",
-                                ),
-                            ],
-                            md=12,
-                        ),
-                    ]
-                ),
-                dbc.Row(
+            dcc.Tab(
+                label="Negative ions",
+                value="mz-h-tab",
+                children=[
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                [
+                                    html.Label(
+                                        "Select Compound:",
+                                        id="mz-h-section",
+                                        className="select-label",
+                                    ),
+                                    dcc.Dropdown(
+                                        id="compound-dropdown",
+                                        options=[
+                                            {"label": mz, "value": mz}
+                                            for mz in get_mz_values("ascending")
+                                        ],
+                                        placeholder="Select Mz Value",
+                                        searchable=True,
+                                        multi=False,
+                                        style={"width": "100%"},
+                                        className="select-input",
+                                        value=get_mz_values("ascending")[0],
+                                    ),
+                                    html.Div(
+                                        id="selected-mz-h-value",
+                                        className="select-label",
+                                    ),
+                                ],
+                                md=12,
+                            ),
+                        ]
+                    ),
+                    dbc.Row(
                     [
                         dbc.Col(
                             [
@@ -118,8 +118,8 @@ tabs_mz = dcc.Tabs(
                         ),
                     ]
                 ),
-            ],
-        ),
+                ],
+            ),
         dcc.Tab(
             label="Positive ions",
             value="mz-plus-tab",
@@ -748,6 +748,12 @@ main_layout = dbc.Container(
                     [
                         dbc.Row(
                             [
+                                # Other components here...
+                                dcc.Interval(id="interval-update", interval=1*60*1000, n_intervals=0),  # Trigger every 60 seconds
+                                html.Div(id='graph-container', children=[
+                                        dcc.Graph(id='gmm-scatter-plot')  # Scatter plot
+                                    ]),
+                                    
                                 dbc.Col(
                                     [tabs_mz, html.Div(id="tabs-content")], md=12),
                             ]

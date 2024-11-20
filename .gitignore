@@ -8,3 +8,7 @@ trying.py
 tumor_test.py
 README.md
 appmap*
+*.csv
+*.xlsx
+*.log
+upload.py

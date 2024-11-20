@@ -143,6 +143,10 @@ a:active { text-decoration: none; }
   padding: 10px;
 } */
 
+.gmm-scatter-plot{
+    height:auto;  /* Set the desired height here */
+}
+
 .column {
     float: left;
     width: 50%;

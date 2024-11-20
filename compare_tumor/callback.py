@@ -16,12 +16,23 @@ from compare_tumor.constant import *
 from dash.exceptions import PreventUpdate
 import json
 import plotly.tools as tls
-from compare_tumor.data_functions import get_mz_values, get_case_columns_query, get_case_columns_vs_query, vs_columnNames, add_comparison_lines, get_case_columns_linear_query, get_cecum_and_ascending_mz_values, get_q05_mz_values, selected_mz_cleaning, get_dropdown_options, forest_plot,forest_plot_rcc_lcc, get_one_qfdr_value
+from compare_tumor.data_functions import get_mz_values, get_case_columns_query, get_case_columns_vs_query, vs_columnNames, add_comparison_lines, get_case_columns_linear_query, get_cecum_and_ascending_mz_values, get_q05_mz_values, selected_mz_cleaning, get_dropdown_options, forest_plot,forest_plot_rcc_lcc, get_one_qfdr_value, get_all_columns_data
+import logging
 
 from compare_tumor.dynamicPlots import tumor_vs_normal_plot, all_regions_plots, comparable_plots, addAnotations
 matplotlib.use("Agg")  
 region = ["cecum", "ascending", "transverse",
           "descending", "sigmoid", "rectosigmoid", "rectum"]
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Adjust to DEBUG for more verbose logs
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # Log to console
+        logging.FileHandler("app.log")  # Save logs to a file
+    ]
+)
 
 
 def register_callbacks(app):
@@ -139,16 +150,82 @@ def register_callbacks(app):
         else:
             # If dropdown is not selected, hide the containers
             return go.Figure(), go.Figure()
+    
+    @app.callback(
+        Output('gmm-scatter-plot', 'figure'),
+        Input("interval-update", "n_intervals")  # Use Interval to trigger the callback
+    )
+    def gmm(n_intervals):
+        print(f"Triggered callback at interval: {n_intervals}")  # Debug log
+        logging.info(f"Triggered callback at interval: {n_intervals}")
+        
+        table_name = "gmm_test_1"
+        logging.info("Starting to fetch data for scatter plot from the table: %s", table_name)
+        print(f"Fetching data from table: {table_name}")  # Debug log
 
-    # @app.callback(
-    #     Output('selected-mz-h-value', 'children'),
-    #     [Input('compound-dropdown', 'value')]
-    # )
-    # def update_selected_mz_value(selected_mz):
-    #     if selected_mz:
-    #         return f"Selected Mz Value: {selected_mz}"
-    #     else:
-    #         return ""
+        # Fetch data
+        try:
+            df = get_all_columns_data(table_name)
+            if df is None or df.empty:
+                logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
+                print(f"Warning: Empty DataFrame for table: {table_name}")  # Debug log
+                return go.Figure()  # Return empty plot
+        except Exception as e:
+            logging.error("Error fetching data: %s", e)
+            print(f"Error: {e}")  # Debug log
+            return go.Figure()
+
+        columns_to_exclude = ['name', 'mz', 'rt', 'list_2_match']
+        filtered_df = df.drop(columns=columns_to_exclude, errors='ignore')  # Safely drop columns
+        print(f"Filtered DataFrame (excluding {columns_to_exclude}):\n{filtered_df.head()}")  # Debug log
+        logging.info("Columns excluded successfully: %s", columns_to_exclude)
+
+        # Reshape DataFrame
+        try:
+            # Melt the filtered DataFrame to long format
+            melted_df = filtered_df.melt(var_name='Column', value_name='Value')
+            logging.info("DataFrame melted successfully")
+            print(f"Melted DataFrame:\n{melted_df.head()}")  # Debug log
+        except Exception as e:
+            logging.error("Error melting DataFrame: %s", e)
+            print(f"Error: {e}")  # Debug log
+            return go.Figure()
+
+        # Create scatter plot
+        fig = go.Figure()
+
+        # Add scatter plot with column names as X-axis and their values as Y-axis
+        fig.add_trace(go.Scatter(
+            x=melted_df['Column'],
+            y=melted_df['Value'],
+            mode='markers',
+            name='Scatter Plot',
+            marker=dict(color='blue')
+        ))
+        logging.info("Scatter plot created successfully")
+        print("Scatter plot created successfully")  # Debug log
+
+        # Update layout
+        fig.update_layout(
+            title='Scatter Plot of All Columns',
+            xaxis_title='',
+            yaxis_title='Values',
+            template="none",  # For general styling, can be set to 'none' for a plain look
+            xaxis=dict(
+                tickangle=90  # Rotate x-axis labels for better readability
+            ),
+            yaxis=dict(
+                range=[-30, 30],  # Set y-axis range from -30 to 30,
+                tickfont=dict(color='black') 
+            ),
+            plot_bgcolor="white",  # Set the background color of the plot to white
+            paper_bgcolor="white"  # Set the background color of the paper (overall canvas)
+        )
+        return fig
+
+
+
+
 
     @app.callback(
         [Output(f'scatter-plot-mz_plus_h-{i}', 'figure') for i in range(7)],

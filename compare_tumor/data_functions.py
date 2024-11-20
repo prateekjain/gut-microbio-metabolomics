@@ -6,6 +6,21 @@ import plotly.graph_objs as go
 from dotenv import load_dotenv
 import pandas as pd
 from compare_tumor.constant import *
+import logging
+import psycopg2
+import pandas as pd
+
+# Configure logging
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,  # Adjust to DEBUG for more verbose logs
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # Log to console
+        logging.FileHandler("app.log")  # Save logs to a file
+    ]
+)
+
 
 all_columns = []
 
@@ -22,7 +37,50 @@ def selected_mz_cleaning(selected_mz):
         # print("updated mz value", selected_mz)
     return selected_mz
 
-# add table name and column names for the function
+def get_all_columns_data(table_name):
+    logging.info("Fetching data from table: %s", table_name)
+    print(f"Fetching data from table: {table_name}")  # Debug log
+
+    try:
+        # Connect to the database
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        logging.info("Database connection established")
+    except Exception as e:
+        logging.error("Error connecting to the database: %s", e)
+        print(f"Error connecting to database: {e}")  # Debug log
+        return None
+
+    try:
+        # Fetch column names
+        cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+        columns = [desc[0] for desc in cursor.description]
+        logging.info("Columns fetched: %s", columns)
+        print(f"Columns: {columns}")  # Debug log
+
+        # Fetch data
+        cursor.execute(f"SELECT * FROM {table_name}")
+        data = cursor.fetchall()
+        logging.info("Data fetched successfully")
+        print(f"Data fetched successfully: {len(data)} rows")  # Debug log
+
+        # Create DataFrame
+        df = pd.DataFrame(data, columns=columns)
+        logging.info("DataFrame created successfully")
+        return df
+    except Exception as e:
+        logging.error("Error fetching data: %s", e)
+        print(f"Error fetching data: {e}")  # Debug log
+        return None
+    finally:
+        # Close connection
+        try:
+            cursor.close()
+            connection.close()
+            logging.info("Database connection closed")
+        except Exception as e:
+            logging.warning("Error closing connection: %s", e)
+            print(f"Error closing connection: {e}")  # Debug log
 
 
 def get_mz_values(table_name):

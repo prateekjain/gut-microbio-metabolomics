@@ -12,7 +12,7 @@ region = ["cecum", "ascending", "transverse",
 external_stylesheets = ['assets/stylesheet.css', 'dbc.themes.BOOTSTRAP']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
                 suppress_callback_exceptions=True)
-app.title = 'Colorectal Cancer Metabolome'
+app.title = 'Gut Microbio Metabolomics'
 server = app.server
 
 
@@ -35,4 +35,5 @@ def display_page(pathname):
 register_callbacks(app)
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True, use_reloader=False)
+
