@@ -150,14 +150,14 @@ def register_callbacks(app):
         else:
             # If dropdown is not selected, hide the containers
             return go.Figure(), go.Figure()
-    
+
     @app.callback(
         Output('gmm-scatter-plot', 'figure'),
-        Input("interval-update", "n_intervals")  # Use Interval to trigger the callback
+        Input("selected-compound-gmm", "value") 
     )
-    def gmm(n_intervals):
-        print(f"Triggered callback at interval: {n_intervals}")  # Debug log
-        logging.info(f"Triggered callback at interval: {n_intervals}")
+    def gmm(selected_compound):
+        print(f"Triggered callback with selected_compound: {selected_compound}")  # Debug log
+        logging.info(f"Triggered callback with selected_compound: {selected_compound}")
         
         table_name = "gmm_test_1"
         logging.info("Starting to fetch data for scatter plot from the table: %s", table_name)
@@ -165,7 +165,7 @@ def register_callbacks(app):
 
         # Fetch data
         try:
-            df = get_all_columns_data(table_name)
+            df = get_all_columns_data(table_name, selected_compound)
             if df is None or df.empty:
                 logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
                 print(f"Warning: Empty DataFrame for table: {table_name}")  # Debug log
@@ -175,54 +175,62 @@ def register_callbacks(app):
             print(f"Error: {e}")  # Debug log
             return go.Figure()
 
-        columns_to_exclude = ['name', 'mz', 'rt', 'list_2_match']
-        filtered_df = df.drop(columns=columns_to_exclude, errors='ignore')  # Safely drop columns
-        print(f"Filtered DataFrame (excluding {columns_to_exclude}):\n{filtered_df.head()}")  # Debug log
-        logging.info("Columns excluded successfully: %s", columns_to_exclude)
+        # Ensure selected compound is valid
+        if not selected_compound or 'name' not in df.columns:
+            logging.warning("Selected compound is invalid or 'name' column not found.")
+            print("Invalid compound or missing 'name' column.")  # Debug log
+            return go.Figure()
 
-        # Reshape DataFrame
+        # Reshape DataFrame for plotting
         try:
-            # Melt the filtered DataFrame to long format
-            melted_df = filtered_df.melt(var_name='Column', value_name='Value')
-            logging.info("DataFrame melted successfully")
+            # Filter out 'name' column from X-axis values
+            columns_to_plot = [col for col in df.columns if col != 'name']
+            melted_df = df.melt(id_vars=['name'], value_vars=columns_to_plot, 
+                                var_name='Column', value_name='Value')
+            logging.info("DataFrame melted successfully for scatter plot.")
             print(f"Melted DataFrame:\n{melted_df.head()}")  # Debug log
         except Exception as e:
-            logging.error("Error melting DataFrame: %s", e)
-            print(f"Error: {e}")  # Debug log
+            logging.error("Error reshaping DataFrame: %s", e)
+            print(f"Error reshaping DataFrame: {e}")  # Debug log
             return go.Figure()
 
         # Create scatter plot
         fig = go.Figure()
-
-        # Add scatter plot with column names as X-axis and their values as Y-axis
+        # for _, row in melted_df.iterrows():
+            # fig.add_trace(go.Scatter(
+            #     x=[melted_df['Column']],
+            #     y=[melted_df['Value']],
+            #     mode='markers',
+            #     name=melted_df['Column'],
+            #     marker=dict(size=10, color='blue')
+            # ))
         fig.add_trace(go.Scatter(
-            x=melted_df['Column'],
-            y=melted_df['Value'],
+            x=melted_df['Column'],  # Directly pass the 'Column' series
+            y=melted_df['Value'],  # Directly pass the 'Value' series
             mode='markers',
-            name='Scatter Plot',
-            marker=dict(color='blue')
+            marker=dict(size=10, color='blue')
         ))
-        logging.info("Scatter plot created successfully")
-        print("Scatter plot created successfully")  # Debug log
+
+        logging.info("Scatter plot created successfully.")
+        print("Scatter plot created successfully.")  # Debug log
 
         # Update layout
         fig.update_layout(
-            title='Scatter Plot of All Columns',
-            xaxis_title='',
+            title=f'Scatter Plot for Selected Compound: {selected_compound}',
+            xaxis_title='Columns',
             yaxis_title='Values',
             template="none",  # For general styling, can be set to 'none' for a plain look
             xaxis=dict(
-                tickangle=90  # Rotate x-axis labels for better readability
+                tickangle=60  # Rotate x-axis labels for better readability
             ),
             yaxis=dict(
-                range=[-30, 30],  # Set y-axis range from -30 to 30,
-                tickfont=dict(color='black') 
+                tickfont=dict(color='black')
             ),
             plot_bgcolor="white",  # Set the background color of the plot to white
             paper_bgcolor="white"  # Set the background color of the paper (overall canvas)
         )
-        return fig
 
+        return fig
 
 
 

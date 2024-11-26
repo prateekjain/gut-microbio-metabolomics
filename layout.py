@@ -4,18 +4,9 @@ from dash import dcc, html
 import dash_bootstrap_components as dbc
 
 from compare_tumor.callback import register_callbacks
-from compare_tumor.data_functions import (
-    get_mz_values,
-    get_case_columns_query,
-    get_case_columns_vs_query,
-    vs_columnNames,
-    add_comparison_lines,
-    get_cecum_and_ascending_mz_values,
-    get_linear_values,
-    get_dropdown_options,
-    get_q05_mz_forest_values,
-    get_all_columns_data
-    )
+from compare_tumor.data_functions import *
+    
+    
 
 region = [
     "cecum",
@@ -744,12 +735,41 @@ main_layout = dbc.Container(
                     "In this section, we present the comparison of metabolite features between patient-matched tumor tissues and matched normal mucosa tissues by anatomical subsite of the colorectum, and across tumor tissues or normal mucosa tissues along the length of the colorectum. This analysis encompasses 10,126 metabolic features acquired in HILIC ESI negative mode and 9,600 features acquired in RPLC ESI positive mode. Statistical significance was determined using a paired Mann-Whitney U test, with all p-values adjusted for multiple comparisons using the Benjamini-Hochberg (BH) false discovery rate (FDR).",
                     className="section-description",
                 ),
+                dbc.Row([
+                    dbc.Col([
+                        html.Label(
+                            "Select Compound:",
+                            id="gmm-section",
+                            className="select-label",
+                        ),
+                        dcc.Dropdown(
+                            id="selected-compound-gmm",
+                            options=[
+                                {"label": name, "value": name}
+                                for name in list(get_gmm_name("gmm_test_1"))
+                            ],
+                            placeholder="Select Mz Value",
+                            searchable=True,
+                            clearable=True,
+                            multi=False,
+                            style={"width": "100%"},
+                            className="select-input",
+                            value=list(get_gmm_name(
+                                "gmm_test_1"))[0],
+                        ),
+                        html.Div(
+                            id="selected-gmm-value",
+                            className="select-label",
+                        ),
+                    ],
+                        md=12,
+                    ),
+                ]),
                 dbc.Col(
                     [
                         dbc.Row(
                             [
-                                # Other components here...
-                                dcc.Interval(id="interval-update", interval=1*60*1000, n_intervals=0),  # Trigger every 60 seconds
+                               
                                 html.Div(id='graph-container', children=[
                                         dcc.Graph(id='gmm-scatter-plot')  # Scatter plot
                                     ]),

@@ -37,7 +37,83 @@ def selected_mz_cleaning(selected_mz):
         # print("updated mz value", selected_mz)
     return selected_mz
 
-def get_all_columns_data(table_name):
+def get_gmm_name(table_name):
+    connection = psycopg2.connect(db_url)
+    cursor = connection.cursor()
+
+    query_gmm_name = f"SELECT DISTINCT name FROM {table_name}"
+    cursor.execute(query_gmm_name)
+    mz_values = [row[0] for row in cursor.fetchall()]
+    print('mz_values', mz_values)
+    cursor.close()
+    connection.close()
+    # print("mzval", mz_values[1])
+    mz_values = sorted(mz_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+    # print("mz_values", mz_values)
+    return mz_values
+
+
+# def get_all_columns_data(table_name, selected_compound):
+#     logging.info("Fetching data from table: %s", table_name)
+#     print(f"Fetching data from table: {table_name}")  # Debug log
+
+#     try:
+#         # Connect to the database
+#         connection = psycopg2.connect(db_url)
+#         cursor = connection.cursor()
+#         logging.info("Database connection established")
+#     except Exception as e:
+#         logging.error("Error connecting to the database: %s", e)
+#         print(f"Error connecting to database: {e}")  # Debug log
+#         return None
+#     try: 
+#         gmm_names = get_gmm_name(table_name)
+#         logging.info("Fetched gmm Names", gmm_names)
+#     except Exception as e:
+#         logging.error("Error fetching gmm Names: %s", e)
+#         print(f"Error fetching gmm Names: {e}")  # Debug log
+#     try:
+#         # Fetch column names
+#         cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+#         columns = [desc[0] for desc in cursor.description]
+#         logging.info("Columns fetched: %s", columns)
+#         print(f"Columns: {columns}")  # Debug log
+
+#         # Fetch data
+#         cursor.execute(f"SELECT * FROM {table_name}")
+#         data = cursor.fetchall()
+#         logging.info("Data fetched successfully")
+#         print(f"Data fetched successfully: {len(data)} rows")  # Debug log
+
+#         # Create DataFrame
+#         df = pd.DataFrame(data, columns=columns)
+#         logging.info("DataFrame created successfully")
+#         return df
+#     except Exception as e:
+#         logging.error("Error fetching data: %s", e)
+#         print(f"Error fetching data: {e}")  # Debug log
+#         return None
+#     finally:
+#         # Close connection
+#         try:
+#             cursor.close()
+#             connection.close()
+#             logging.info("Database connection closed")
+#         except Exception as e:
+#             logging.warning("Error closing connection: %s", e)
+#             print(f"Error closing connection: {e}")  # Debug log
+
+def get_all_columns_data(table_name, selected_compound):
+    """
+    Fetches all rows from a specific table for the selected compound.
+
+    Args:
+        table_name (str): Name of the table in the database.
+        selected_compound (str): Name of the compound to filter by.
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame containing all rows for the selected compound.
+    """
     logging.info("Fetching data from table: %s", table_name)
     print(f"Fetching data from table: {table_name}")  # Debug log
 
@@ -58,29 +134,50 @@ def get_all_columns_data(table_name):
         logging.info("Columns fetched: %s", columns)
         print(f"Columns: {columns}")  # Debug log
 
-        # Fetch data
-        cursor.execute(f"SELECT * FROM {table_name}")
+        # Ensure 'name' column exists
+        if 'name' not in columns:
+            logging.error("'name' column not found in table: %s", table_name)
+            print(f"Error: 'name' column not found in table: {table_name}")  # Debug log
+            return None
+
+        # Fetch all rows for the selected compound
+        # Use parameterized query to prevent SQL injection
+        query = f"SELECT * FROM {table_name} WHERE name = %s"
+        
+        cursor.execute(query, (selected_compound,))
         data = cursor.fetchall()
-        logging.info("Data fetched successfully")
-        print(f"Data fetched successfully: {len(data)} rows")  # Debug log
+
+        if not data:
+            logging.warning("No data found for compound: %s", selected_compound)
+            print(f"Warning: No data found for compound: {selected_compound}")  # Debug log
+            return None
+
+        logging.info("Data fetched successfully for compound: %s", selected_compound)
+        print(f"Data fetched successfully for compound: {selected_compound}. Rows: {data}")  # Debug log
 
         # Create DataFrame
         df = pd.DataFrame(data, columns=columns)
-        logging.info("DataFrame created successfully")
+        columns_to_exclude = [ 'mz', 'rt', 'list_2_match']
+        df = df.drop(columns=columns_to_exclude, errors='ignore')
+        logging.info("DataFrame created successfully for compound: %s", selected_compound)
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        logging.info("Duplicate rows removed, resulting DataFrame shape: %s", df.shape)
+        print(f"DataFrame after removing duplicates:\n{df}")  # Debug log
+
         return df
+
     except Exception as e:
         logging.error("Error fetching data: %s", e)
         print(f"Error fetching data: {e}")  # Debug log
         return None
+
     finally:
-        # Close connection
-        try:
+        # Ensure cursor and connection are closed
+        if cursor:
             cursor.close()
+        if connection:
             connection.close()
-            logging.info("Database connection closed")
-        except Exception as e:
-            logging.warning("Error closing connection: %s", e)
-            print(f"Error closing connection: {e}")  # Debug log
 
 
 def get_mz_values(table_name):
