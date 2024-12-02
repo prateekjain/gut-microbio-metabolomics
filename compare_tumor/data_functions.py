@@ -53,55 +53,7 @@ def get_gmm_name(table_name):
     return mz_values
 
 
-# def get_all_columns_data(table_name, selected_compound):
-#     logging.info("Fetching data from table: %s", table_name)
-#     print(f"Fetching data from table: {table_name}")  # Debug log
 
-#     try:
-#         # Connect to the database
-#         connection = psycopg2.connect(db_url)
-#         cursor = connection.cursor()
-#         logging.info("Database connection established")
-#     except Exception as e:
-#         logging.error("Error connecting to the database: %s", e)
-#         print(f"Error connecting to database: {e}")  # Debug log
-#         return None
-#     try: 
-#         gmm_names = get_gmm_name(table_name)
-#         logging.info("Fetched gmm Names", gmm_names)
-#     except Exception as e:
-#         logging.error("Error fetching gmm Names: %s", e)
-#         print(f"Error fetching gmm Names: {e}")  # Debug log
-#     try:
-#         # Fetch column names
-#         cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-#         columns = [desc[0] for desc in cursor.description]
-#         logging.info("Columns fetched: %s", columns)
-#         print(f"Columns: {columns}")  # Debug log
-
-#         # Fetch data
-#         cursor.execute(f"SELECT * FROM {table_name}")
-#         data = cursor.fetchall()
-#         logging.info("Data fetched successfully")
-#         print(f"Data fetched successfully: {len(data)} rows")  # Debug log
-
-#         # Create DataFrame
-#         df = pd.DataFrame(data, columns=columns)
-#         logging.info("DataFrame created successfully")
-#         return df
-#     except Exception as e:
-#         logging.error("Error fetching data: %s", e)
-#         print(f"Error fetching data: {e}")  # Debug log
-#         return None
-#     finally:
-#         # Close connection
-#         try:
-#             cursor.close()
-#             connection.close()
-#             logging.info("Database connection closed")
-#         except Exception as e:
-#             logging.warning("Error closing connection: %s", e)
-#             print(f"Error closing connection: {e}")  # Debug log
 
 def get_all_columns_data(table_name, selected_compound):
     """
@@ -178,6 +130,139 @@ def get_all_columns_data(table_name, selected_compound):
             cursor.close()
         if connection:
             connection.close()
+
+
+def get_all_columns_data_all_compounds(table_name):
+    """
+    Fetches all rows and columns from the given table.
+
+    Args:
+        table_name (str): Name of the table in the database.
+
+    Returns:
+        pd.DataFrame: DataFrame containing all rows and columns.
+    """
+    logging.info("Fetching data from table: %s", table_name)
+    print(f"Fetching data from table: {table_name}")  # Debug log
+
+    try:
+        # Connect to the database
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        logging.info("Database connection established")
+    except Exception as e:
+        logging.error("Error connecting to the database: %s", e)
+        print(f"Error connecting to database: {e}")  # Debug log
+        return None
+
+    try:
+        # Fetch all data
+        query = f"SELECT * FROM {table_name}"
+        cursor.execute(query)
+        data = cursor.fetchall()
+
+        # Get column names
+        columns = [desc[0] for desc in cursor.description]
+        logging.info("Columns fetched: %s", columns)
+        print(f"Columns: {columns}")  # Debug log
+
+        # Create DataFrame
+        df = pd.DataFrame(data, columns=columns)
+        columns_to_exclude = [ 'mz', 'rt', 'list_2_match']
+        df = df.drop(columns=columns_to_exclude, errors='ignore')
+        logging.info("DataFrame created successfully for the table: %s", table_name)
+
+        # Drop duplicates if any
+        df = df.drop_duplicates()
+        print(f"DataFrame after removing duplicates:\n{df}")  # Debug log
+
+        return df
+
+    except Exception as e:
+        logging.error("Error fetching data: %s", e)
+        print(f"Error fetching data: {e}")  # Debug log
+        return None
+
+    finally:
+        # Ensure cursor and connection are closed
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+def get_column_names(table_name):
+    """
+    Fetches all column names except the 'name' column from the table.
+
+    Args:
+        table_name (str): Name of the table.
+
+    Returns:
+        list: List of column names.
+    """
+    connection = psycopg2.connect(db_url)
+    cursor = connection.cursor()
+    
+    columns_to_exclude = ['mz', 'rt', 'list_2_match', 'name']
+
+    # Establishing connection
+    connection = psycopg2.connect(db_url)
+    cursor = connection.cursor()
+    
+    # Dynamically generating the query excluding unwanted columns
+    query = f"SELECT * FROM {table_name} LIMIT 0"
+    cursor.execute(query)
+    columns = [desc[0] for desc in cursor.description if desc[0] not in columns_to_exclude]
+    
+    cursor.close()
+    connection.close()
+    return columns
+
+
+def get_bacteria_names(table_name):
+    """
+    Fetches all distinct bacteria names (or rows in the 'name' column).
+
+    Args:
+        table_name (str): Name of the table.
+
+    Returns:
+        list: List of unique bacteria names.
+    """
+    connection = psycopg2.connect(db_url)
+    cursor = connection.cursor()
+
+    # Columns to exclude
+    columns_to_exclude = ['mz', 'rt', 'list_2_match']
+    
+    # Fetch all columns in the table
+    cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'")
+    all_columns = [row[0] for row in cursor.fetchall()]
+
+    # Exclude the specified columns
+    columns_to_include = [col for col in all_columns if col not in columns_to_exclude]
+    
+    # Create the query to select distinct names, excluding the unwanted columns
+    query = f"SELECT DISTINCT name FROM {table_name} WHERE name IS NOT NULL"
+    
+    # Execute the query to get distinct bacteria names
+    cursor.execute(query)
+    names = [row[0] for row in cursor.fetchall()]
+    cursor.close()
+    connection.close()
+    
+    return names
+
+
+
+
+
+
+
+
+
+
 
 
 def get_mz_values(table_name):

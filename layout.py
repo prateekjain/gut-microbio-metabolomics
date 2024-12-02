@@ -727,60 +727,119 @@ main_layout = dbc.Container(
         dbc.Row(
             [
                 html.H2(
-                    "Tumor vs. Normal Mucosa Metabolic features Comparison Across Subsites",
+                    "Different Heading",
                     className="section-heading",
                     id="section1",
                 ),
                 html.P(
-                    "In this section, we present the comparison of metabolite features between patient-matched tumor tissues and matched normal mucosa tissues by anatomical subsite of the colorectum, and across tumor tissues or normal mucosa tissues along the length of the colorectum. This analysis encompasses 10,126 metabolic features acquired in HILIC ESI negative mode and 9,600 features acquired in RPLC ESI positive mode. Statistical significance was determined using a paired Mann-Whitney U test, with all p-values adjusted for multiple comparisons using the Benjamini-Hochberg (BH) false discovery rate (FDR).",
+                    "Something to write here.",
                     className="section-description",
                 ),
-                dbc.Row([
-                    dbc.Col([
-                        html.Label(
-                            "Select Compound:",
-                            id="gmm-section",
-                            className="select-label",
-                        ),
-                        dcc.Dropdown(
-                            id="selected-compound-gmm",
-                            options=[
-                                {"label": name, "value": name}
-                                for name in list(get_gmm_name("gmm_test_1"))
+                dbc.Row(
+                    [
+                        dbc.Col(
+                        [
+                            html.Label(
+                                        "Select Compound:",
+                                        id="gmm-section",
+                                        className="select-label",
+                                    ), 
+                            dcc.Dropdown(
+                                    id="selected-compound-gmm",
+                                    options=[
+                                        {"label": name, "value": name}
+                                        for name in list(get_gmm_name("gmm_test_1"))
+                                    ],
+                                    placeholder="Select Mz Value",
+                                    searchable=True,
+                                    clearable=True,
+                                    multi=False,
+                                    style={"width": "100%"},
+                                    className="select-input",
+                                    value=list(get_gmm_name("gmm_test_1"))[0],
+                                ),
+                            dcc.Loading(
+                                id="outer-container-plus-loading",
+                                type="circle",
+                                children=[
+                                    html.Div(
+                                        [
+                                            html.Div(
+                                                id="selected-gmm-value",
+                                                className="select-label",
+                                            ),
+                                        dcc.Graph(
+                                            id='gmm-scatter-plot',
+                                            className="gmm-scatter-plot",
+                                        )
+    
                             ],
-                            placeholder="Select Mz Value",
-                            searchable=True,
-                            clearable=True,
-                            multi=False,
-                            style={"width": "100%"},
-                            className="select-input",
-                            value=list(get_gmm_name(
-                                "gmm_test_1"))[0],
-                        ),
-                        html.Div(
-                            id="selected-gmm-value",
-                            className="select-label",
+                            className="outer-container",
                         ),
                     ],
-                        md=12,
-                    ),
-                ]),
+                ),
+            ],
+            md=12,
+        ),
+            dbc.Row([
                 dbc.Col(
                     [
-                        dbc.Row(
-                            [
-                               
-                                html.Div(id='graph-container', children=[
-                                        dcc.Graph(id='gmm-scatter-plot')  # Scatter plot
-                                    ]),
-                                    
-                                dbc.Col(
-                                    [tabs_mz, html.Div(id="tabs-content")], md=12),
-                            ]
+                        html.Label("Select Metabolites:", className="select-label"),
+                        dcc.Dropdown(
+                            id="selected-metabolites",
+                            options=[
+                                {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                            ],
+                            placeholder="Select Metabolites",
+                            multi=True,  # Allow multi-selection
+                            searchable=True,
+                            clearable=True,
+                            style={"width": "100%"},
+                            className="select-input",
                         ),
                     ],
-                    md=12,
+                    md=6,
                 ),
+                dbc.Col(
+                    [
+                        html.Label("Select Bacteria:", className="select-label"),
+                        dcc.Dropdown(
+                            id="selected-bacteria",
+                            options=[
+                                {"label": name, "value": name} for name in list(get_bacteria_names("gmm_test_1"))
+                            ],
+                            placeholder="Select Bacteria",
+                            multi=True,  # Allow multi-selection
+                            searchable=True,
+                            clearable=True,
+                            style={"width": "100%"},
+                            className="select-input",
+                        ),
+                    ],
+                    md=6,
+                ),
+            ]),
+
+            dcc.Loading(
+                id="outer-container-plus-loading-heatmap",
+                type="circle",
+                children=[
+                    html.Div(
+                        [
+                            dcc.Graph(
+                                id='gmm-heatmap-plot',
+                                className="gmm-heatmap-plot",
+                            )
+                        ],
+                        className="outer-container",
+                    ),
+                ],
+            ),
+
+
+                    ]
+                )
+
             ]
         ),
         html.Div(className="border-line"),

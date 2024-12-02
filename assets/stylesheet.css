@@ -144,8 +144,20 @@ a:active { text-decoration: none; }
 } */
 
 .gmm-scatter-plot{
-    height:auto;  /* Set the desired height here */
+    height: 650px; /*  Set the desired height here */
+    width: 100%;
 }
+.graph-container{
+    height: 750px; /*  Set the desired height here */
+    width: 75%;
+}
+
+.gmm-heatmap-plot {
+    height: 600px;
+    width: 100%;
+    margin-top: 20px;
+}
+
 
 .column {
     float: left;

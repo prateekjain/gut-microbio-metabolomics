@@ -16,7 +16,7 @@ from compare_tumor.constant import *
 from dash.exceptions import PreventUpdate
 import json
 import plotly.tools as tls
-from compare_tumor.data_functions import get_mz_values, get_case_columns_query, get_case_columns_vs_query, vs_columnNames, add_comparison_lines, get_case_columns_linear_query, get_cecum_and_ascending_mz_values, get_q05_mz_values, selected_mz_cleaning, get_dropdown_options, forest_plot,forest_plot_rcc_lcc, get_one_qfdr_value, get_all_columns_data
+from compare_tumor.data_functions import get_mz_values, get_case_columns_query, get_case_columns_vs_query, vs_columnNames, add_comparison_lines, get_case_columns_linear_query, get_cecum_and_ascending_mz_values, get_q05_mz_values, selected_mz_cleaning, get_dropdown_options, forest_plot,forest_plot_rcc_lcc, get_one_qfdr_value, get_all_columns_data, get_all_columns_data_all_compounds
 import logging
 
 from compare_tumor.dynamicPlots import tumor_vs_normal_plot, all_regions_plots, comparable_plots, addAnotations
@@ -221,16 +221,120 @@ def register_callbacks(app):
             yaxis_title='Values',
             template="none",  # For general styling, can be set to 'none' for a plain look
             xaxis=dict(
-                tickangle=60  # Rotate x-axis labels for better readability
+                tickangle=90,  # Rotate x-axis labels for better readability
+                
             ),
             yaxis=dict(
                 tickfont=dict(color='black')
             ),
+            margin=dict( b=250),  # Add more bottom margin
             plot_bgcolor="white",  # Set the background color of the plot to white
             paper_bgcolor="white"  # Set the background color of the paper (overall canvas)
         )
 
         return fig
+
+
+    @app.callback(
+        Output('gmm-heatmap-plot', 'figure'),
+        [
+            Input("selected-metabolites", "value"),
+            Input("selected-bacteria", "value"),
+        ]
+    )
+    def gmm_heatmap_multiple(selected_metabolites, selected_bacteria):
+        print(f"Selected Metabolites: {selected_metabolites}, Selected Bacteria: {selected_bacteria}")  # Debug log
+        logging.info(f"Selected Metabolites: {selected_metabolites}, Selected Bacteria: {selected_bacteria}")
+        
+        table_name = "gmm_test_1"
+
+        # Fetch all data
+        try:
+            df = get_all_columns_data_all_compounds(table_name)
+            if df is None or df.empty:
+                logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
+                return go.Figure()  # Return empty plot
+        except Exception as e:
+            logging.error("Error fetching data: %s", e)
+            return go.Figure()
+
+        # Filter data based on selected metabolites and bacteria
+        try:
+            if selected_metabolites:
+                df = df[["name"] + selected_metabolites]
+            if selected_bacteria:
+                df = df[df["name"].isin(selected_bacteria)]
+            logging.info("Data filtered for heatmap.")
+            print(f"Filtered DataFrame:\n{df.head()}")  # Debug log
+        except Exception as e:
+            logging.error("Error filtering data: %s", e)
+            return go.Figure()
+
+        # Add row for the sum of selected bacteria
+        try:
+            sum_row = df.drop(columns=["name"]).sum(axis=0)  # Sum across rows for selected metabolites
+            sum_row.name = "Net Balance"  # Set a name for the row
+            df = pd.concat([sum_row.to_frame().T, df.set_index("name")])  # Add the sum row
+            df.reset_index(inplace=True)  # Reset index to have a clean structure
+            logging.info("Added row for the sum of selected bacteria.")
+            print(f"Updated DataFrame with sum row:\n{df.tail()}")  # Debug log
+        except Exception as e:
+            logging.error("Error adding sum row: %s", e)
+            return go.Figure()
+
+        # Prepare data for heatmap
+        try:
+            heatmap_data = df.set_index('index').T  # Use the reset index as the new row/column labels
+            print(f"Heatmap Data:\n{heatmap_data.head()}")  # Debug log to verify the data structure
+        except Exception as e:
+            logging.error("Error preparing data for heatmap: %s", e)
+            return go.Figure()
+
+        # Create heatmap
+        try:
+            fig = go.Figure(data=go.Heatmap(
+                z=heatmap_data.values,
+                x=heatmap_data.index,
+                y=heatmap_data.columns,
+                colorscale='Viridis',
+                colorbar=dict(title="Value"),
+            ))
+
+            # Update layout
+            fig.update_layout(
+                title='Heatmap for Selected Metabolites and Bacteria',
+                xaxis_title='Bacteria',
+                yaxis_title='Metabolites',
+                xaxis=dict(tickangle=90),
+                yaxis=dict(tickfont=dict(color='black')),
+                margin=dict(l=100, r=100, t=50, b=250),
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+            )
+            return fig
+
+        except Exception as e:
+            logging.error("Error creating heatmap: %s", e)
+            return go.Figure()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
