@@ -781,6 +781,8 @@ main_layout = dbc.Container(
             ],
             md=12,
         ),
+        html.Div(className="border-line"),
+                        
             dbc.Row([
                 dbc.Col(
                     [

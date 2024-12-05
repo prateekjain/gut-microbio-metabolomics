@@ -258,6 +258,8 @@ def register_callbacks(app):
             logging.error("Error fetching data: %s", e)
             return go.Figure()
 
+        print('First DataFrame:', df)
+        
         # Filter data based on selected metabolites and bacteria
         try:
             if selected_metabolites:
@@ -270,22 +272,34 @@ def register_callbacks(app):
             logging.error("Error filtering data: %s", e)
             return go.Figure()
 
-        # Add row for the sum of selected bacteria
         try:
-            sum_row = df.drop(columns=["name"]).sum(axis=0)  # Sum across rows for selected metabolites
-            sum_row.name = "Net Balance"  # Set a name for the row
-            df = pd.concat([sum_row.to_frame().T, df.set_index("name")])  # Add the sum row
-            df.reset_index(inplace=True)  # Reset index to have a clean structure
+            # Convert numeric columns to numeric and set "name" as index
+            numeric_df = df.set_index("name").apply(pd.to_numeric, errors="coerce")
+            print('numeric_df', numeric_df)
+            # Check for NaN values in the DataFrame
+            if numeric_df.isnull().values.any():
+                logging.warning("DataFrame contains NaN values. These will be ignored during summation.")
+                print(f"DataFrame with NaN values:\n{numeric_df}")
+
+            # Compute the sum of all bacteria for each metabolite (row-wise sum)
+            sum_row = numeric_df.sum(axis=1, skipna=True)  
+
+            # Add the sum row as "Net Balance"
+            numeric_df["Net Balance"] = sum_row
+            numeric_df = pd.concat([numeric_df[["Net Balance"]].T, numeric_df.drop(columns="Net Balance").T]).T
+            print('numeric_df1', numeric_df)
             logging.info("Added row for the sum of selected bacteria.")
-            print(f"Updated DataFrame with sum row:\n{df.tail()}")  # Debug log
+            print(f"Updated DataFrame with Net Balance row:\n{numeric_df.tail()}")  # Debug log
         except Exception as e:
-            logging.error("Error adding sum row: %s", e)
+            logging.error("Error adding Net Balance row: %s", e)
             return go.Figure()
 
-        # Prepare data for heatmap
+
+        # Prepare heatmap data
         try:
-            heatmap_data = df.set_index('index').T  # Use the reset index as the new row/column labels
-            print(f"Heatmap Data:\n{heatmap_data.head()}")  # Debug log to verify the data structure
+            heatmap_data = numeric_df.T  # Transpose the DataFrame so metabolites are columns (x-axis), bacteria are rows (y-axis)
+            print(f"Heatmap Data:\n{heatmap_data.head()}")  # Debug log
+            
         except Exception as e:
             logging.error("Error preparing data for heatmap: %s", e)
             return go.Figure()
@@ -293,18 +307,21 @@ def register_callbacks(app):
         # Create heatmap
         try:
             fig = go.Figure(data=go.Heatmap(
-                z=heatmap_data.values,
-                x=heatmap_data.index,
-                y=heatmap_data.columns,
-                colorscale='Viridis',
+                z=heatmap_data.values,  # Heatmap values
+                x=heatmap_data.columns,  # Metabolites
+                y=heatmap_data.index,    # Bacteria, including "Net Balance"
+                colorscale='RdYlGn', # Spectral
                 colorbar=dict(title="Value"),
+                text=heatmap_data.values,  # Add the cell values
+                texttemplate="%{text:.2f}",  # Format text to show two decimal places
+                textfont={"size": 10},  # Adjust text font size
             ))
 
             # Update layout
             fig.update_layout(
                 title='Heatmap for Selected Metabolites and Bacteria',
-                xaxis_title='Bacteria',
-                yaxis_title='Metabolites',
+                xaxis_title='Metabolites',
+                yaxis_title='Bacteria',
                 xaxis=dict(tickangle=90),
                 yaxis=dict(tickfont=dict(color='black')),
                 margin=dict(l=100, r=100, t=50, b=250),
@@ -316,6 +333,8 @@ def register_callbacks(app):
         except Exception as e:
             logging.error("Error creating heatmap: %s", e)
             return go.Figure()
+
+
 
 
 
