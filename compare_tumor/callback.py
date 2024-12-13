@@ -168,11 +168,12 @@ def register_callbacks(app):
             df = get_all_columns_data(table_name, selected_compound)
             if df is None or df.empty:
                 logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
-                print(f"Warning: Empty DataFrame for table: {table_name}")  # Debug log
                 return go.Figure()  # Return empty plot
+            else:
+                logging.info(f"Fetched {len(df)} rows from the table.")  # Log the row count
+                print(f"Fetched {len(df)} rows.")  # Debug log
         except Exception as e:
             logging.error("Error fetching data: %s", e)
-            print(f"Error: {e}")  # Debug log
             return go.Figure()
 
         # Ensure selected compound is valid
@@ -188,31 +189,31 @@ def register_callbacks(app):
             melted_df = df.melt(id_vars=['name'], value_vars=columns_to_plot, 
                                 var_name='Column', value_name='Value')
             logging.info("DataFrame melted successfully for scatter plot.")
-            print(f"Melted DataFrame:\n{melted_df.head()}")  # Debug log
+            # print(f"Melted DataFrame:\n{melted_df.head()}")  # Debug log
         except Exception as e:
             logging.error("Error reshaping DataFrame: %s", e)
             print(f"Error reshaping DataFrame: {e}")  # Debug log
             return go.Figure()
+        
+        try:
+            melted_df['Column'] = melted_df['Column'].str.replace("_", " ").str.upper()
+            print(melted_df['Column'])
+        except Exception as e:
+            logging.error("Error processing 'Column' values: %s", e)
+            print(f"Error processing 'Column' values: {e}")  
 
-        # Create scatter plot
         fig = go.Figure()
-        # for _, row in melted_df.iterrows():
-            # fig.add_trace(go.Scatter(
-            #     x=[melted_df['Column']],
-            #     y=[melted_df['Value']],
-            #     mode='markers',
-            #     name=melted_df['Column'],
-            #     marker=dict(size=10, color='blue')
-            # ))
+        marker_size = max(5, 200 // len(melted_df['Column'].unique()))
+        # print(f"Fetched columns {len(melted_df['Column'])} rows.")
         fig.add_trace(go.Scatter(
             x=melted_df['Column'],  # Directly pass the 'Column' series
             y=melted_df['Value'],  # Directly pass the 'Value' series
             mode='markers',
-            marker=dict(size=10, color='blue')
+            marker=dict(size=marker_size, color='#1D78B4')
         ))
 
         logging.info("Scatter plot created successfully.")
-        print("Scatter plot created successfully.")  # Debug log
+        # print("Scatter plot created successfully.")  # Debug log
 
         # Update layout
         fig.update_layout(
@@ -221,18 +222,35 @@ def register_callbacks(app):
             yaxis_title='Values',
             template="none",  # For general styling, can be set to 'none' for a plain look
             xaxis=dict(
-                tickangle=90,  # Rotate x-axis labels for better readability
+                tickvals=list(range(len(melted_df['Column']))),
+                tickfont=dict(size=max(8, 400 // len(melted_df['Column'].unique()))),
+                automargin=True,      
+                minor=dict(ticks='outside'),
+                ticks='outside',
+                ticklen=5,
+                anchor='y',
+                range=[0, len(melted_df['Column']) ]
+ 
                 
             ),
             yaxis=dict(
-                tickfont=dict(color='black')
+                tickfont=dict(color='black'),
+                showline=True,  # Ensures the axis line is visible
+                linecolor='black',  # Make the axis line prominent
+                linewidth=0.1,
+                automargin=True,
+                minor=dict(ticks='outside'),
+                ticks='outside',
+                ticklen=5,  
             ),
-            margin=dict( b=250),  # Add more bottom margin
+            
+            margin=dict(b=200),  # Add more bottom margin
             plot_bgcolor="white",  # Set the background color of the plot to white
             paper_bgcolor="white"  # Set the background color of the paper (overall canvas)
-        )
+        ),
 
         return fig
+
 
 
     @app.callback(

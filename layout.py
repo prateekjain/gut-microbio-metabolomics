@@ -709,11 +709,22 @@ main_layout = dbc.Container(
                 dbc.Col(
                     [
                         html.Br(),
-                        html.H1("Colorectal Cancer Metabolome Database",
+                        html.H1("Microbiome Metabolome Database",
                                 className="title"),
                         html.P("About", className="about-text"),
                         html.P(
-                            "Unlocking the complexities of colorectal cancer (CRC) requires a deeper understanding of its molecular landscape across different subsites of the colorectum. Our database is designed to serve as a comprehensive resource for researchers, clinicians, and enthusiasts alike, providing invaluable insights into CRC metabolomics and its implications for diagnosis, prognosis, and treatment. Explore metabolite markers across different colorectal subsites and identify survival markers for precision medicine. Join us in unraveling the intricacies of CRC and translating findings into impactful outcomes. Welcome to the forefront of colorectal cancer research!",
+                            [
+                                "This database is a comprehensive resource for exploring the metabolic activities of individual gut bacterial species and their roles in human health and disease. ",
+                                html.Br(), 
+                                html.Br(),
+                                "It integrates data from 310 in vitro bacterial cultures and 112 monocolonized mouse models, each hosting a single bacterial species, providing insights into species-specific metabolic profiles in both controlled environments and host systems. ",
+                                html.Br(), 
+                                html.Br(),
+                                "By comparing in vitro and in vivo metabolomics data, the database highlights key biochemical pathways and their significance in host-microbe interactions, including immune modulation and other physiological processes. ",
+                                html.Br(),
+                                html.Br(),
+                                "By offering detailed datasets and user-friendly tools for analysis and visualization, we aim to advance the understanding of gut microbial metabolites and their interactions with the host. Discover the intricate metabolic landscape of gut bacteria with us and contribute to groundbreaking insights in microbiome research.",
+                            ],
                             className="para",
                         ),
                         button_table,
