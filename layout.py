@@ -769,6 +769,17 @@ main_layout = dbc.Container(
                                     className="select-input",
                                     value=list(get_gmm_name("gmm_test_1"))[0],
                                 ),
+                            dcc.RadioItems(
+                                id="data-display-selector",
+                                options=[
+                                    {"label": "Show All Data", "value": "all"},
+                                    {"label": "Top 10 Values", "value": "top"},
+                                    {"label": "Bottom 10 Values", "value": "bottom"},
+                                ],
+                                value="all",
+                                labelStyle={"display": "inline-block"},
+                                className="select-input",
+                            ),
                             dcc.Loading(
                                 id="outer-container-plus-loading",
                                 type="circle",
@@ -959,7 +970,7 @@ main_layout = dbc.Container(
         dbc.Row(
             [
                 html.H2(
-                    "Inter-subsite metabolites comparisons",
+                    "Inter-subsite metabolites comparisons", 
                     className="section-heading",
                     id="section3",
                 ),

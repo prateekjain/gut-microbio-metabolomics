@@ -255,7 +255,80 @@ def get_bacteria_names(table_name):
     return names
 
 
+def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, order="desc"):
+    """
+    Fetches the top or bottom N bacteria values for a specific compound from the database.
 
+    Args:
+        table_name (str): Name of the table in the database.
+        selected_compound (str): Name of the compound to filter by.
+        top_n (int): Number of values to fetch (default is 10).
+        order (str): Fetch order - 'desc' for top values, 'asc' for bottom values.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the top or bottom N bacteria values for the compound.
+    """
+    try:
+        # Connect to the database
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        logging.info("Database connection established")
+    except Exception as e:
+        logging.error("Error connecting to the database: %s", e)
+        return None
+
+    try:
+        # Fetch column names
+        cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+        columns = [desc[0] for desc in cursor.description]
+
+        # Filter bacterial columns (exclude non-bacterial columns like 'name', 'mz', 'rt')
+        bacterial_columns = [col for col in columns if col not in ['name', 'mz', 'rt', 'list_2_match']]
+        print("bacterial_columns", bacterial_columns)
+        if not bacterial_columns:
+            logging.error("No bacterial columns found in the table: %s", table_name)
+            return None
+
+        # Query to fetch data for the selected compound
+        query = f"SELECT name, {', '.join(bacterial_columns)} FROM {table_name} WHERE name = %s"
+        cursor.execute(query, (selected_compound,))
+        data = cursor.fetchall()
+
+        # Check if data is available
+        if not data:
+            logging.warning("No data found for compound: %s", selected_compound)
+            return None
+
+        # Create DataFrame from fetched data
+        df = pd.DataFrame(data, columns=["name"] + bacterial_columns)
+
+        # Melt DataFrame to transform bacterial columns into rows
+        df_melted = df.melt(id_vars=["name"], var_name="bacteria", value_name="value")
+        print('df_melted \n', df_melted)
+        # Filter rows with non-null values
+        df_filtered = df_melted[df_melted["value"].notnull()]
+
+        # Sort by value and fetch top or bottom N
+        ascending = True if order.lower() == "asc" else False
+        df_sorted = df_filtered.sort_values(by="value", ascending=ascending)
+
+        # Drop duplicates based on 'bacteria' while keeping the highest/lowest value
+        df_sorted = df_sorted.drop_duplicates(subset="bacteria", keep="first").head(top_n)
+        
+        logging.info(f"Fetched {len(df_sorted)} rows for {order.upper()} {top_n} values of compound: {selected_compound}.")
+        print('df_sorted', df_sorted)
+        return df_sorted
+
+    except Exception as e:
+        logging.error("Error fetching top/bottom values: %s", e)
+        return None
+
+    finally:
+        # Ensure cursor and connection are closed
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 
 

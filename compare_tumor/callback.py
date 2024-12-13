@@ -16,7 +16,7 @@ from compare_tumor.constant import *
 from dash.exceptions import PreventUpdate
 import json
 import plotly.tools as tls
-from compare_tumor.data_functions import get_mz_values, get_case_columns_query, get_case_columns_vs_query, vs_columnNames, add_comparison_lines, get_case_columns_linear_query, get_cecum_and_ascending_mz_values, get_q05_mz_values, selected_mz_cleaning, get_dropdown_options, forest_plot,forest_plot_rcc_lcc, get_one_qfdr_value, get_all_columns_data, get_all_columns_data_all_compounds
+from compare_tumor.data_functions import get_mz_values, get_case_columns_query, get_case_columns_vs_query, vs_columnNames, add_comparison_lines, get_case_columns_linear_query, get_cecum_and_ascending_mz_values, get_q05_mz_values, selected_mz_cleaning, get_dropdown_options, forest_plot,forest_plot_rcc_lcc, get_one_qfdr_value, get_all_columns_data, get_all_columns_data_all_compounds, get_top_bottom_bacteria_values
 import logging
 
 from compare_tumor.dynamicPlots import tumor_vs_normal_plot, all_regions_plots, comparable_plots, addAnotations
@@ -152,104 +152,204 @@ def register_callbacks(app):
             return go.Figure(), go.Figure()
 
     @app.callback(
-        Output('gmm-scatter-plot', 'figure'),
-        Input("selected-compound-gmm", "value") 
+        Output("gmm-scatter-plot", "figure"),
+        [
+            Input("selected-compound-gmm", "value"),
+            Input("data-display-selector", "value"),
+        ],
     )
-    def gmm(selected_compound):
-        print(f"Triggered callback with selected_compound: {selected_compound}")  # Debug log
-        logging.info(f"Triggered callback with selected_compound: {selected_compound}")
-        
+    def update_scatter_plot(selected_compound, data_display):
+        logging.info(f"Triggered callback with compound: {selected_compound}, display: {data_display}")
+
         table_name = "gmm_test_1"
-        logging.info("Starting to fetch data for scatter plot from the table: %s", table_name)
-        print(f"Fetching data from table: {table_name}")  # Debug log
 
-        # Fetch data
         try:
-            df = get_all_columns_data(table_name, selected_compound)
-            if df is None or df.empty:
-                logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
-                return go.Figure()  # Return empty plot
+            # Fetch data based on the selected display option
+            if data_display == "all":
+                df = get_all_columns_data(table_name, selected_compound)
+            elif data_display in ["top", "bottom"]:
+                order = "desc" if data_display == "top" else "asc"
+                df = get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, order=order)
             else:
-                logging.info(f"Fetched {len(df)} rows from the table.")  # Log the row count
-                print(f"Fetched {len(df)} rows.")  # Debug log
+                logging.warning("Invalid data display option.")
+                return go.Figure()  # Return an empty figure
+
+            # Handle edge cases
+            if df is None or df.empty:
+                logging.warning("No data available.")
+                return go.Figure()
+
+            # Prepare DataFrame for plotting
+            if data_display == "all":
+                # Reshape for 'all' data
+                try:
+            #         # Filter out 'name' column from X-axis values
+                    columns_to_plot = [col for col in df.columns if col != 'name']
+                    melted_df = df.melt(id_vars=['name'], value_vars=columns_to_plot, 
+                                        var_name='Column', value_name='Value') 
+                    print('melted_df', melted_df)
+                    logging.info("DataFrame melted successfully for scatter plot.")
+                    # print(f"Melted DataFrame:\n{melted_df.head()}")  # Debug log
+                except Exception as e:
+                    logging.error("Error reshaping DataFrame: %s", e)
+                    print(f"Error reshaping DataFrame: {e}")  # Debug log
+                    return go.Figure()
+            else:
+                # For 'top' or 'bottom', use the data directly
+                melted_df = df.copy()
+            
+            # Plot
+            fig = go.Figure()
+            x_axis = (
+                melted_df["Column"] if data_display == "all" else melted_df["bacteria"].str.replace("_", " ").str.upper()
+            )
+            y_axis = melted_df["Value"] if data_display == "all" else melted_df["value"]
+
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x_axis,
+                    y=y_axis,
+                    mode="markers",
+                    marker=dict(size=max(5, 100 // len(x_axis.unique())), color="#1D78B4"),
+                )
+            )
+
+            # Update layout
+            title = (
+                f"Scatter Plot for {selected_compound} ({'All Data' if data_display == 'all' else data_display.capitalize()} 10)"
+            )
+            fig.update_layout(
+                title=title,
+                xaxis_title="Bacteria",
+                yaxis_title="Values",
+                template="plotly_white",
+                xaxis=dict(
+                    tickvals=list(range(len(x_axis))),
+                    tickfont=dict(size=max(8, 100 // len(x_axis.unique()))),
+                    automargin=True,      
+                    minor=dict(ticks='outside'),
+                    ticks='outside',
+                    ticklen=5,
+                    anchor='y',
+                    range=[0, len(x_axis) ]
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='black'),
+                    showline=True,  # Ensures the axis line is visible
+                    linecolor='black',  # Make the axis line prominent
+                    linewidth=0.1,
+                    automargin=True,
+                    minor=dict(ticks='outside'),
+                    ticks='outside',
+                    ticklen=5,  
+                ),
+            )
+            return fig
+
         except Exception as e:
-            logging.error("Error fetching data: %s", e)
+            logging.error("Error in callback: %s", e)
             return go.Figure()
 
-        # Ensure selected compound is valid
-        if not selected_compound or 'name' not in df.columns:
-            logging.warning("Selected compound is invalid or 'name' column not found.")
-            print("Invalid compound or missing 'name' column.")  # Debug log
-            return go.Figure()
-
-        # Reshape DataFrame for plotting
-        try:
-            # Filter out 'name' column from X-axis values
-            columns_to_plot = [col for col in df.columns if col != 'name']
-            melted_df = df.melt(id_vars=['name'], value_vars=columns_to_plot, 
-                                var_name='Column', value_name='Value')
-            logging.info("DataFrame melted successfully for scatter plot.")
-            # print(f"Melted DataFrame:\n{melted_df.head()}")  # Debug log
-        except Exception as e:
-            logging.error("Error reshaping DataFrame: %s", e)
-            print(f"Error reshaping DataFrame: {e}")  # Debug log
-            return go.Figure()
+    # @app.callback(
+    #     Output('gmm-scatter-plot', 'figure'),
+    #     Input("selected-compound-gmm", "value") 
+    # )
+    # def gmm(selected_compound):
+    #     print(f"Triggered callback with selected_compound: {selected_compound}")  # Debug log
+    #     logging.info(f"Triggered callback with selected_compound: {selected_compound}")
         
-        try:
-            melted_df['Column'] = melted_df['Column'].str.replace("_", " ").str.upper()
-            print(melted_df['Column'])
-        except Exception as e:
-            logging.error("Error processing 'Column' values: %s", e)
-            print(f"Error processing 'Column' values: {e}")  
+    #     table_name = "gmm_test_1"
+    #     logging.info("Starting to fetch data for scatter plot from the table: %s", table_name)
+    #     print(f"Fetching data from table: {table_name}")  # Debug log
 
-        fig = go.Figure()
-        marker_size = max(5, 200 // len(melted_df['Column'].unique()))
-        # print(f"Fetched columns {len(melted_df['Column'])} rows.")
-        fig.add_trace(go.Scatter(
-            x=melted_df['Column'],  # Directly pass the 'Column' series
-            y=melted_df['Value'],  # Directly pass the 'Value' series
-            mode='markers',
-            marker=dict(size=marker_size, color='#1D78B4')
-        ))
+    #     # Fetch data
+    #     try:
+    #         df = get_all_columns_data(table_name, selected_compound)
+    #         if df is None or df.empty:
+    #             logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
+    #             return go.Figure()  # Return empty plot
+    #         else:
+    #             logging.info(f"Fetched {len(df)} rows from the table.")  # Log the row count
+    #             print(f"Fetched {len(df)} rows.")  # Debug log
+    #     except Exception as e:
+    #         logging.error("Error fetching data: %s", e)
+    #         return go.Figure()
 
-        logging.info("Scatter plot created successfully.")
-        # print("Scatter plot created successfully.")  # Debug log
+    #     # Ensure selected compound is valid
+    #     if not selected_compound or 'name' not in df.columns:
+    #         logging.warning("Selected compound is invalid or 'name' column not found.")
+    #         print("Invalid compound or missing 'name' column.")  # Debug log
+    #         return go.Figure()
 
-        # Update layout
-        fig.update_layout(
-            title=f'Scatter Plot for Selected Compound: {selected_compound}',
-            xaxis_title='Columns',
-            yaxis_title='Values',
-            template="none",  # For general styling, can be set to 'none' for a plain look
-            xaxis=dict(
-                tickvals=list(range(len(melted_df['Column']))),
-                tickfont=dict(size=max(8, 400 // len(melted_df['Column'].unique()))),
-                automargin=True,      
-                minor=dict(ticks='outside'),
-                ticks='outside',
-                ticklen=5,
-                anchor='y',
-                range=[0, len(melted_df['Column']) ]
+    #     # Reshape DataFrame for plotting
+    #     try:
+    #         # Filter out 'name' column from X-axis values
+    #         columns_to_plot = [col for col in df.columns if col != 'name']
+    #         melted_df = df.melt(id_vars=['name'], value_vars=columns_to_plot, 
+    #                             var_name='Column', value_name='Value')
+    #         logging.info("DataFrame melted successfully for scatter plot.")
+    #         # print(f"Melted DataFrame:\n{melted_df.head()}")  # Debug log
+    #     except Exception as e:
+    #         logging.error("Error reshaping DataFrame: %s", e)
+    #         print(f"Error reshaping DataFrame: {e}")  # Debug log
+    #         return go.Figure()
+        
+    #     try:
+    #         melted_df['Column'] = melted_df['Column'].str.replace("_", " ").str.upper()
+    #         print(melted_df['Column'])
+    #     except Exception as e:
+    #         logging.error("Error processing 'Column' values: %s", e)
+    #         print(f"Error processing 'Column' values: {e}")  
+
+    #     fig = go.Figure()
+    #     marker_size = max(5, 200 // len(melted_df['Column'].unique()))
+    #     # print(f"Fetched columns {len(melted_df['Column'])} rows.")
+    #     fig.add_trace(go.Scatter(
+    #         x=melted_df['Column'],  # Directly pass the 'Column' series
+    #         y=melted_df['Value'],  # Directly pass the 'Value' series
+    #         mode='markers',
+    #         marker=dict(size=marker_size, color='#1D78B4')
+    #     ))
+
+    #     logging.info("Scatter plot created successfully.")
+    #     # print("Scatter plot created successfully.")  # Debug log
+
+    #     # Update layout
+    #     fig.update_layout(
+    #         title=f'Scatter Plot for Selected Compound: {selected_compound}',
+    #         xaxis_title='Columns',
+    #         yaxis_title='Values',
+    #         template="none",  # For general styling, can be set to 'none' for a plain look
+    #         xaxis=dict(
+    #             tickvals=list(range(len(melted_df['Column']))),
+    #             tickfont=dict(size=max(8, 400 // len(melted_df['Column'].unique()))),
+    #             automargin=True,      
+    #             minor=dict(ticks='outside'),
+    #             ticks='outside',
+    #             ticklen=5,
+    #             anchor='y',
+    #             range=[0, len(melted_df['Column']) ]
  
                 
-            ),
-            yaxis=dict(
-                tickfont=dict(color='black'),
-                showline=True,  # Ensures the axis line is visible
-                linecolor='black',  # Make the axis line prominent
-                linewidth=0.1,
-                automargin=True,
-                minor=dict(ticks='outside'),
-                ticks='outside',
-                ticklen=5,  
-            ),
+    #         ),
+    #         yaxis=dict(
+    #             tickfont=dict(color='black'),
+    #             showline=True,  # Ensures the axis line is visible
+    #             linecolor='black',  # Make the axis line prominent
+    #             linewidth=0.1,
+    #             automargin=True,
+    #             minor=dict(ticks='outside'),
+    #             ticks='outside',
+    #             ticklen=5,  
+    #         ),
             
-            margin=dict(b=200),  # Add more bottom margin
-            plot_bgcolor="white",  # Set the background color of the plot to white
-            paper_bgcolor="white"  # Set the background color of the paper (overall canvas)
-        ),
+    #         margin=dict(b=200),  # Add more bottom margin
+    #         plot_bgcolor="white",  # Set the background color of the plot to white
+    #         paper_bgcolor="white"  # Set the background color of the paper (overall canvas)
+    #     ),
 
-        return fig
+    #     return fig
 
 
 
@@ -353,6 +453,37 @@ def register_callbacks(app):
             return go.Figure()
 
 
+    # @app.callback(
+    #     Output("gmm-scatter-plot", "figure"),
+    #     [
+    #         Input("selected-compound-gmm", "value"),
+    #         Input("top-bottom-selector", "value"),
+    #     ],
+    # )
+    # def update_scatter_plot(selected_compound, top_bottom):
+    #     print(f"Triggered callback with selected_compound: {selected_compound}, top_bottom: {top_bottom}")
+    #     order = "desc" if top_bottom == "top" else "asc"
+    #     df = get_top_bottom_bacteria_values("gmm_test_1", top_n=10, order=order)
+
+    #     if df is None or df.empty:
+    #         return go.Figure()
+
+    #     fig = go.Figure()
+    #     fig.add_trace(
+    #         go.Scatter(
+    #             x=df["name"],
+    #             y=df["value"],
+    #             mode="markers",
+    #             marker=dict(size=10, color="#1D78B4"),
+    #         )
+    #     )
+    #     fig.update_layout(
+    #         title=f"{'Top' if order == 'desc' else 'Bottom'} 10 Bacteria for {selected_compound}",
+    #         xaxis_title="Bacteria",
+    #         yaxis_title="Values",
+    #         template="plotly_white",
+    #     )
+    #     return fig
 
 
 
