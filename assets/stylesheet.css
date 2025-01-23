@@ -145,7 +145,8 @@ a:active { text-decoration: none; }
 
 .gmm-scatter-plot{
     height: 650px; /*  Set the desired height here */
-    width: 100%;
+    width: 100%; /* Ensure scatter plot is wider than the container */
+    margin-top: 20px;
 }
 .graph-container{
     height: 750px; /*  Set the desired height here */
@@ -153,7 +154,7 @@ a:active { text-decoration: none; }
 }
 
 .gmm-heatmap-plot {
-    height: 600px;
+    height: auto;
     width: 100%;
     margin-top: 20px;
 }
@@ -365,17 +366,39 @@ a:active { text-decoration: none; }
 .outer-container {
     width: 80%;
     padding: 20px;
+    
     margin: 0 auto;
     box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
     border-radius: 8px;
+    overflow-y: auto;
     overflow-x: auto; 
-    white-space: nowrap;
+    /* white-space: nowrap; */
+    box-sizing: border-box;
+    position: relative;
+    /* overflow: hidden; Ensure the container doesn't scroll */
+    
 }
+.scatter-container {
+    width: auto; /* Automatically adjust based on content width */
+    height: 600px; /* Set a fixed height for the scrollable container */
+    /* overflow-y: auto; Enable vertical scrolling */
+    overflow-x: auto;/*  Prevent horizontal scrolling */
+    margin: 0 auto;
+}
+
+.scatter-container-heat {
+    width: auto; /* Automatically adjust based on content width */
+    height: 600px; /* Set a fixed height for the scrollable container */
+    /* overflow-y: auto; Enable vertical scrolling */
+    overflow-x: auto;/*  Prevent horizontal scrolling */
+    margin: 0 auto;
+}
+
 
 .inner-container {
     display: flex;
     overflow-x: auto;
-    width: 97%;
+    width: 100%;
     padding: 20px;
 }
 

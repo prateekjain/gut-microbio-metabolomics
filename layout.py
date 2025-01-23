@@ -503,43 +503,7 @@ study_info_dropdown = html.Div(
 )
 
 
-# mega_menu = html.Div([
-#     html.Div(className="navbar", children=[
-        
-#         html.Div(className="tab", children=[
-#             "Study Information 1",
-#             html.Div(className="dropdown-content", id="dropdown-content-1", children=[
-#                 html.Div(className="options-column", children=[
-#                     html.Div(className="option", children=[
-#                              "Sample cohort informatio"], id="cohort-option"),
-#                     html.Div(className="option", children=[
-#                              "Sample preparation and LC-MS Analysis"], id="preparation-option"),
-#                     html.Div(className="option", children=[
-#                              "Metabolic feature identification"], id="feature-option"),
-#                     html.Div(className="option", children=[
-#                              "Link to publication and citing the database"], id="link-option"),
-#                     html.Div(className="option", children=[
-#                              "Project and funding information"], id="project-option"),
-#                     html.Div(className="option", children=[
-#                              "Contact"], id="contact-option")
-#                 ]),
-#                 html.Div(className="options-column", children=[
-#                     html.Div(className="option-details", children=[
-#                         "Patient-matched tumor tissues and normal mucosa tissues (collected furthest away from tumor within the subsite) were surgically removed during colectomy for colorectal cancer in the operating room at Memorial Sloan Kettering Cancer Center (MSKCC), New York, NY, USA, frozen immediately in liquid nitrogen and stored at -80oC before analysis. Sample were collected in 1991-2001. The Yale University Institutional Review Board (IRB) determined that the study conducted in this publication was not considered to be Human Subjects Research and did not require an IRB review (IRB/HSC# 1612018746). Patient characteristics can be found in supplementary table 1 in our publication: (link)."
-#                     ], id="cohort-details"),
-#                     html.Div(className="option-details", children=["Detailed sample preparation and LC-MS information can be found in our publication here (link). The data displayed in this database was acquired from the analysis of patient-matched tumor tissues and normal mucosa using a UPLC-ESI-QTOFMS (H-Class ACQUITY and Xevo G2-XS; Waters Corporation, Milford, MA, USA) was used for MS data acquisitionby RPLC ESI positive and HILIC ESI negative mode. We chose to make our data available in the format of this database, other data requests, along with protocols and codes can be made by email, please see contact us section."], id="preparation-details"),
-#                     html.Div(className="option-details", children=["In this database we have displayed all metabolite features generated from the analysis of the tumor tissues and normal mucosa tissues, by electrospray ionization (ESI) mode; negative or positive. These features are displayed in Section 1. For subsequent sections we only display annotated metabolites. The level of annotation is defined by the metabolomics standards initiative (MSI) levels; Level 1:…….Level 2:…….Level 3:……..Metabolite identification methods are published in Jain. Et al…..(paper under submission)."], id="feature-details"),
-#                     html.Div(className="option-details", children=[
-#                              "Please cite the following: Jain A, ...paper details here"], id="link-details"),
-#                     html.Div(className="option-details", children=[
-#                              "The data acquired in this database was supported by funding from the American Cancer Society awarded to Caroline Johnson, and the Yale Center for Clinical Investigation awarded to Abhishek Jain."], id="project-details"),
-#                     html.Div(className="option-details", children=[
-#                              "Please contact Caroline Johnson: caroline.johnson@yale.edu  or Abhishek Jain: a.jain@yale.edu for any inquiries"], id="contact-details"),
-#                 ])
-#             ])
-#         ],),
-#     ]),
-# ])
+
 footer_layout = html.Footer(
     className='footer',
     id='footer',
@@ -684,23 +648,25 @@ google_analytics_scripts = html.Div([
     """)
 ])
 
-
 main_layout = dbc.Container(
     [
         google_analytics_scripts,
-        
         html.Div(
             className='header-bar',
             children=[
                 dbc.Row(
-                [
-                    html.Div(className="tab", children=[
-                        html.A("More Information",
-                               className = "moreinfo",
-                               href="#footer",)
-                        ]
-                    ),
-                ]
+                    [
+                        html.Div(
+                            className="tab",
+                            children=[
+                                html.A(
+                                    "More Information",
+                                    className="moreinfo",
+                                    href="#footer",
+                                )
+                            ],
+                        ),
+                    ]
                 ),
             ]
         ),
@@ -709,18 +675,15 @@ main_layout = dbc.Container(
                 dbc.Col(
                     [
                         html.Br(),
-                        html.H1("Microbiome Metabolome Database",
-                                className="title"),
+                        html.H1(
+                            "Microbiome Metabolome Database",
+                            className="title"
+                        ),
                         html.P("About", className="about-text"),
                         html.P(
                             [
-                                "This database is a comprehensive resource for exploring the metabolic activities of individual gut bacterial species and their roles in human health and disease. ",
-                                html.Br(), 
-                                html.Br(),
-                                "It integrates data from 310 in vitro bacterial cultures and 112 monocolonized mouse models, each hosting a single bacterial species, providing insights into species-specific metabolic profiles in both controlled environments and host systems. ",
-                                html.Br(), 
-                                html.Br(),
-                                "By comparing in vitro and in vivo metabolomics data, the database highlights key biochemical pathways and their significance in host-microbe interactions, including immune modulation and other physiological processes. ",
+                                "This database is a comprehensive resource for exploring the metabolic activities of individual gut bacterial species and their roles in human health and disease. "
+                                "It integrates data from 310 in vitro bacterial cultures and 112 monocolonized mouse models, each hosting a single bacterial species, providing insights into species-specific metabolic profiles in both controlled environments and host systems. By comparing in vitro and in vivo metabolomics data, the database highlights key biochemical pathways and their significance in host-microbe interactions, including immune modulation and other physiological processes. ",
                                 html.Br(),
                                 html.Br(),
                                 "By offering detailed datasets and user-friendly tools for analysis and visualization, we aim to advance the understanding of gut microbial metabolites and their interactions with the host. Discover the intricate metabolic landscape of gut bacteria with us and contribute to groundbreaking insights in microbiome research.",
@@ -749,13 +712,13 @@ main_layout = dbc.Container(
                 dbc.Row(
                     [
                         dbc.Col(
-                        [
-                            html.Label(
-                                        "Select Compound:",
-                                        id="gmm-section",
-                                        className="select-label",
-                                    ), 
-                            dcc.Dropdown(
+                            [
+                                html.Label(
+                                    "Select Compound:",
+                                    id="gmm-section",
+                                    className="select-label",
+                                ),
+                                dcc.Dropdown(
                                     id="selected-compound-gmm",
                                     options=[
                                         {"label": name, "value": name}
@@ -769,345 +732,150 @@ main_layout = dbc.Container(
                                     className="select-input",
                                     value=list(get_gmm_name("gmm_test_1"))[0],
                                 ),
-                            dcc.RadioItems(
-                                id="data-display-selector",
-                                options=[
-                                    {"label": "Show All Data", "value": "all"},
-                                    {"label": "Top 10 Values", "value": "top"},
-                                    {"label": "Bottom 10 Values", "value": "bottom"},
-                                ],
-                                value="all",
-                                labelStyle={"display": "inline-block"},
-                                className="select-input",
-                            ),
-                            dcc.Loading(
-                                id="outer-container-plus-loading",
-                                type="circle",
-                                children=[
-                                    html.Div(
-                                        [
-                                            html.Div(
-                                                id="selected-gmm-value",
-                                                className="select-label",
-                                            ),
-                                        dcc.Graph(
-                                            id='gmm-scatter-plot',
-                                            className="gmm-scatter-plot",
-                                        )
-    
+                                dcc.RadioItems(
+                                    id="data-display-selector",
+                                    options=[
+                                        {"label": "Show All Data", "value": "all"},
+                                        {"label": "Top 10 Values", "value": "top"},
+                                        {"label": "Bottom 10 Values", "value": "bottom"},
+                                    ],
+                                    value="all",
+                                    labelStyle={"display": "inline-block"},
+                                    className="select-input",
+                                ),
+                                dcc.Loading(
+                                    id="outer-container-plus-loading",
+                                    type="circle",
+                                    children=[
+                                        html.Div(
+                                            [
+                                                html.Div(
+                                                    id="selected-gmm-value",
+                                                    className="select-label",
+                                                ),
+                                                html.Div(
+                                                    dcc.Graph(
+                                                        id='gmm-scatter-plot',
+                                                        className="gmm-scatter-plot",
+                                                    ),
+                                                    className="scatter-container",  # Inner scrollable container
+                                                ),
+                                            ],
+                                            className="outer-container",
+                                        ),
+                                    ],
+                                ),
+                            ],
+                            md=12,
+                        ),
+                    ]
+                ),
+                html.Div(className="border-line"),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.Label("Select Bacteria:", className="select-label"),
+                                dcc.Dropdown(
+                                    id="selected-metabolites",
+                                    options=[
+                                        {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                    ],
+                                    placeholder="Select Bacteria",
+                                    multi=True,  # Allow multi-selection
+                                    searchable=True,
+                                    clearable=True,
+                                    style={"width": "100%"},
+                                    className="select-input",
+                                ),
+                            ],
+                            md=6,
+                        ),
+                        dbc.Col(
+                            [
+                                html.Label("Select Metabolites:", className="select-label"),
+                                dcc.Dropdown(
+                                    id="selected-bacteria",
+                                    options=[
+                                        {"label": name, "value": name} for name in list(get_bacteria_names("gmm_test_1"))
+                                    ],
+                                    placeholder="Select Metabolites",
+                                    multi=True,  # Allow multi-selection
+                                    searchable=True,
+                                    clearable=True,
+                                    style={"width": "100%"},
+                                    className="select-input",
+                                ),
+                            ],
+                            md=6,
+                        ),
+                    ]
+                ),
+                dcc.Loading(
+                    id="outer-container-plus-loading-heatmap",
+                    type="circle",
+                    children=[
+                        html.Div(
+                            [
+                                html.Div(
+                                    dcc.Graph(
+                                        id='gmm-heatmap-plot',
+                                        className="gmm-heatmap-plot",
+                                        config={'responsive': True},  # Enable responsiveness
+                                    ),
+                                    className="scatter-container-heat",  # Inner scrollable container
+                                ),
                             ],
                             className="outer-container",
                         ),
                     ],
                 ),
-            ],
-            md=12,
-        ),
-        html.Div(className="border-line"),
-                        
-            dbc.Row([
-                dbc.Col(
+                html.Div(className="border-line"),
+                dbc.Row(
                     [
-                        html.Label("Select Metabolites:", className="select-label"),
-                        dcc.Dropdown(
-                            id="selected-metabolites",
-                            options=[
-                                {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                        dbc.Col(
+                            [
+                                html.Label("Select Bacteria:", className="select-label"),
+                                dcc.Dropdown(
+                                    id="selected-bacteria-top",
+                                    options=[
+                                        {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                    ],
+                                    placeholder="Select Bacteria",
+                                    multi=True,  # Allow multi-selection
+                                    searchable=True,
+                                    clearable=True,
+                                    style={"width": "100%"},
+                                    className="select-input",
+                                ),
                             ],
-                            placeholder="Select Metabolites",
-                            multi=True,  # Allow multi-selection
-                            searchable=True,
-                            clearable=True,
-                            style={"width": "100%"},
-                            className="select-input",
+                            md=6,
                         ),
-                    ],
-                    md=6,
-                ),
-                dbc.Col(
-                    [
-                        html.Label("Select Bacteria:", className="select-label"),
-                        dcc.Dropdown(
-                            id="selected-bacteria",
-                            options=[
-                                {"label": name, "value": name} for name in list(get_bacteria_names("gmm_test_1"))
-                            ],
-                            placeholder="Select Bacteria",
-                            multi=True,  # Allow multi-selection
-                            searchable=True,
-                            clearable=True,
-                            style={"width": "100%"},
-                            className="select-input",
-                        ),
-                    ],
-                    md=6,
-                ),
-            ]),
-
-            dcc.Loading(
-                id="outer-container-plus-loading-heatmap",
-                type="circle",
-                children=[
-                    html.Div(
-                        [
-                            dcc.Graph(
-                                id='gmm-heatmap-plot',
-                                className="gmm-heatmap-plot",
-                            )
-                        ],
-                        className="outer-container",
-                    ),
-                ],
-            ),
-
-
                     ]
-                )
-
-            ]
-        ),
-        html.Div(className="border-line"),
-        # add tabs to it
-        dbc.Row(
-            [
-                html.H2(
-                    "Tumor vs. Normal Mucosa Metabolite Comparison Across Subsites",
-                    className="section-heading",
-                    id="section2",
                 ),
-                html.P(
-                    "In this section, we present the comparison of identified metabolites between patient-matched tumor tissues and normal mucosa tissues in each of the seven subsites of the colorectum. This analysis focuses on 409 annotated metabolites; 220 were annotated using authentic standards by LC-MS (MSI levels 1 and 2), and 190 annotated were annotated using in silico methods (MSI level 3). Statistical significance was assessed using a paired Mann-Whitney U test, with all p-values adjusted for multiple comparisons using the Benjamini-Hochberg (BH) false discovery rate (FDR) method. Additionally, users can analyze the unique metabolite alteration specific to each subsite.",
-                    className="section-description",
-                ),
-            ]),
-        dbc.Row([
-                dbc.Col([
-                    html.Label(
-                        "Select Filter:",
-                        id="filter-section-meta",
-                        className="select-label",
-                    ),
-                    dcc.RadioItems(
-                        id="filter-radio",
-                        options=[
-                            {"label": "All metabolites", "value": "all"},
-                            {"label": "Metabolites altered across all subsites",
-                             "value": "across_all"},
-                            {"label": "Subsites specific alterations",
-                             "value": "specific_subsites"},
-                            {"label": "Proximal or Distal subsites",
-                             "value": "proximal_distal"},
-                        ],
-                        value="all",
-                        inline=True,  # Display radio items horizontally
-                        className="select-input",
-                    ),
-                ],
-                    md=4,
-                ),
-                ]),
-        dbc.Row([
-                dbc.Col([
-                    html.Label(
-                        "Select Compound:",
-                        id="meta-section",
-                        className="select-label",
-                    ),
-                    dcc.Dropdown(
-                        id="compound-dropdown-meta",
-                        placeholder="Select Meta Value",
-                        searchable=True,
-                        multi=False,
-                        style={"width": "100%"},
-                        className="select-input",
-                    ),
-                    html.Div(
-                        id="selected-meta-value",
-                        className="select-label",
-                    ),
-                ],
-                    md=12,
-                ),
-                ]),
-
-        dbc.Row(
-            [
-                dbc.Col(
-                    [
-                        dcc.Loading(
-                            id="outer-container-plus-loading",
-                            type="circle",
-                            children=[
+                dcc.Loading(
+                    id="outer-container-plus-loading-scatter-top",
+                    type="circle",
+                    children=[
+                        html.Div(
+                            [
                                 html.Div(
-                                    [
-                                        dbc.Row(
-                                            [
-                                                dbc.Col(
-                                                    [
-                                                        dcc.Graph(
-                                                            id=f"scatter-plot-meta-{i}",
-                                                            className="scatter-plot",
-                                                        )
-                                                        for i in range(7)
-                                                    ],
-                                                    className="inner-container",
-                                                ),
-                                            ]
-                                        ),
-
-                                    ],
-                                    className="outer-container with-shadow",
+                                    dcc.Graph(
+                                        id='gmm-scatter-top-plot',
+                                        className="gmm-scatter-top-plot",
+                                        config={'responsive': True},  # Enable responsiveness
+                                    ),
+                                    className="scatter-container-top",  # Inner scrollable container
                                 ),
                             ],
+                            className="outer-container",
                         ),
                     ],
-                    md=12,
                 ),
-            ]
-        ),
-        html.Div(className="border-line"),
-
-        dbc.Row(
-            [
-                html.H2(
-                    "Inter-subsite metabolites comparisons", 
-                    className="section-heading",
-                    id="section3",
-                ),
-                html.P(
-                    "This section facilitates a comparative analysis of metabolite profiles within tumors and normal tissues separately, enabling users to explore inter-subsite metabolite variations across the seven CRC subsites. Moreover, users can discern differences in metabolite abundances among right-sided colorectal cancer, left-sided colorectal cancer, and rectal cancer, encompassing both tumor-tumor and normal-normal comparisons. Statistical significance was determined using Kruskal-Wallis ANOVA with Dunn’s post hoc test, with a two-sided adjusted p-value ≤ 0.05 indicating statistical significance.",
-                    className="section-description",
-                ),
-            ]
-        ),
-        dbc.Row(
-            [
-                dbc.Col([tabs_compare, html.Div(id="tabs-content")], md=12),
-                # dbc.Col([dcc.Dropdown(id="image-dropdown", className="select-input",
-                #                       options=get_dropdown_options(),
-                #                       value=get_dropdown_options()[0]["value"])], md=4),
-                # dbc.Col([
-                #     html.Div([
-                #         html.Img(id="selected-image", style={"width": "80%"}),
-                #     ], id="selected-image-container")
-                # ], md=8),
             ]
         ),
 
-        html.Div(className="border-line"),
-        dbc.Row(
-            [
-                html.H2(
-                    "Linear metabolite gradient across colorectal subsites",
-                    className="section-heading",
-                    id="section4",
-                ),
-                html.P(
-                    "This section enables users to analyze metabolite concentration gradients across the colorectum. A linear regression analysis was conducted between subsites and metabolite abundance to assess the presence of a consistent linear trend from the cecum to the rectum. A p-value ≤ 0.05 indicates a statistically significant linear relationship of the CRC subsites with metabolite abundance, suggesting a linear change in metabolite concentrations along the colorectal tract.",
-                    className="section-description",
-                ),
-                dbc.Col(
-                    [
-                        html.Label(
-                            "Select Compound:",
-                            id="mz-linear-section",
-                            className="select-label",
-                        ),
-                        dcc.Dropdown(
-                            id="compound-dropdown-linear",
-                            options=[
-                                {"label": mz, "value": mz}
-                                for mz in list(get_linear_values(["tumor_linear_plots", "normal_linear_plots"]))
-                            ],
-                            placeholder="Select Mz Value",
-                            searchable=True,
-                            clearable=True,
-                            multi=False,
-                            style={"width": "100%"},
-                            className="select-input",
-                            value=list(get_linear_values(
-                                ["tumor_linear_plots", "normal_linear_plots"]))[0],
-                        ),
-                        html.Div(id="selected-mz-linear-value"),
-
-                    ],
-                    md=12,
-                ),
-            ]
-        ),
-        dbc.Row(
-            [
-                dbc.Col(
-                    [
-                        dcc.Loading(
-                            id="outer-container-loading",
-                            type="circle",
-                            children=[
-                                html.Div(
-                                    [
-                                        dcc.Graph(
-                                            id="tumor-linear-plot",
-                                            className="tumor-linear-plot",
-                                        ),
-                                        dcc.Graph(
-                                            id="normal-linear-plot",
-                                            className="normal-linear-plot",
-                                        ),
-                                    ],
-                                    style={"display": "flex"},
-                                    className="outer-container with-shadow",
-                                ),
-                            ],
-                        ),
-                    ],
-                    md=12,
-                ),
-            ]
-        ),
-        html.Div(className="border-line"),
-        dbc.Row(
-            [
-                html.H2(
-                    "Survival Metabolite Marker Comparison Across Colorectal Subsites",
-                    className="section-heading",
-                    id="section5",
-                ),
-                html.P(
-                    "In this section, we present the comparison of survival metabolite markers between colorectal subsites. Cox proportional hazard regression analysis was performed to identify the association between log2 abundances of individual metabolites and 5-year overall survival in each subsite, adjusting for age, sex chemotherapy, and stage. A two-sided p-value less than 0.05 was considered statistically significant. Additionally, users can analyze the unique survival markers specific to each subsite",
-                    className="section-description",
-                ),
-
-            ]),
-        dbc.Row(
-            [
-                dbc.Col(
-                    [
-                        dbc.Col([tabs_survival, html.Div(
-                            id="tabs-content")], md=12),
-
-                    ],
-                    md=12,
-                ),
-            ]
-        ),
-        html.Div(className="border-line"),
-
-        dbc.Row(
-            [
-                dbc.Col(
-                    [
-                        dcc.Loading(
-                            id="loading",
-                            className="loading",
-                            type="circle",
-                            children=[html.Div(id="loading-output")],
-                        ),
-                    ],
-                    md=12,
-                ),
-            ]
-        ),
-    footer_layout     
+        footer_layout,
     ],
     fluid=True,
 )

@@ -44,7 +44,7 @@ def get_gmm_name(table_name):
     query_gmm_name = f"SELECT DISTINCT name FROM {table_name}"
     cursor.execute(query_gmm_name)
     mz_values = [row[0] for row in cursor.fetchall()]
-    print('mz_values', mz_values)
+    # print('mz_values', mz_values)
     cursor.close()
     connection.close()
     # print("mzval", mz_values[1])
@@ -80,11 +80,12 @@ def get_all_columns_data(table_name, selected_compound):
         return None
 
     try:
+        
         # Fetch column names
         cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
         columns = [desc[0] for desc in cursor.description]
         logging.info("Columns fetched: %s", columns)
-        print(f"Columns: {columns}")  # Debug log
+        # print(f"Columns: {columns}")  # Debug log
 
         # Ensure 'name' column exists
         if 'name' not in columns:
@@ -115,7 +116,7 @@ def get_all_columns_data(table_name, selected_compound):
         # Remove duplicate rows
         df = df.drop_duplicates()
         logging.info("Duplicate rows removed, resulting DataFrame shape: %s", df.shape)
-        print(f"DataFrame after removing duplicates:\n{df}")  # Debug log
+        # print(f"DataFrame after removing duplicates:\n{df}")  # Debug log
 
         return df
 
@@ -164,7 +165,7 @@ def get_all_columns_data_all_compounds(table_name):
         # Get column names
         columns = [desc[0] for desc in cursor.description]
         logging.info("Columns fetched: %s", columns)
-        print(f"Columns: {columns}")  # Debug log
+        # print(f"Columns: {columns}")  # Debug log
 
         # Create DataFrame
         df = pd.DataFrame(data, columns=columns)
@@ -191,6 +192,82 @@ def get_all_columns_data_all_compounds(table_name):
             connection.close()
 
 
+
+def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
+    """
+    Fetches all metabolites for the selected bacteria where the bacteria collectively rank among the top 10 producers.
+
+    Args:
+        table_name (str): Name of the table in the database.
+        selected_bacteria (list): List of bacteria to filter by.
+
+    Returns:
+        pd.DataFrame: Filtered DataFrame containing metabolites for selected bacteria in the top 10.
+    """
+    logging.info("Fetching top metabolites for selected bacteria: %s", selected_bacteria)
+    if not selected_bacteria:
+        return None
+
+    try:
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+
+        # Fetch column names dynamically
+        cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
+        all_columns = [row[0] for row in cursor.fetchall()]
+        logging.info("Columns fetched from table: %s", all_columns)
+
+        # Exclude non-bacteria columns
+        non_bacteria_columns = ["name", "mz", "rt", "list_2_match"]  # Adjust based on your schema
+        bacteria_columns = [col for col in all_columns if col not in non_bacteria_columns]
+        logging.info("Bacteria columns determined dynamically: %s", bacteria_columns)
+
+        # Build the dynamic UNPIVOT query
+        unpivot_query = " UNION ALL ".join(
+            [f"SELECT name AS metabolite, '{col}' AS bacteria, {col} AS value FROM {table_name}" for col in bacteria_columns]
+        )
+        query = f"""
+        WITH UnpivotedData AS (
+            {unpivot_query}
+        ),
+        RankedBacteria AS (
+            SELECT
+                metabolite,
+                bacteria,
+                value,
+                RANK() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
+            FROM UnpivotedData
+        )
+        SELECT * FROM RankedBacteria WHERE rank <= 10;
+        """
+        logging.info("Executing query:\n%s", query)
+
+        cursor.execute(query, (selected_bacteria,))
+        data = cursor.fetchall()
+        print('data here',data)
+
+        if not data:
+            logging.warning("No data found for selected bacteria in the top 10 metabolites: %s", selected_bacteria)
+            return None
+
+        # Create DataFrame
+        columns = [desc[0] for desc in cursor.description]
+        df = pd.DataFrame(data, columns=columns)
+        logging.info("Data fetched successfully for selected bacteria in the top 10 metabolites.")
+        return df
+
+    except Exception as e:
+        logging.error("Error fetching data: %s", e)
+        return None
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+            
+            
 def get_column_names(table_name):
     """
     Fetches all column names except the 'name' column from the table.
@@ -284,7 +361,7 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
 
         # Filter bacterial columns (exclude non-bacterial columns like 'name', 'mz', 'rt')
         bacterial_columns = [col for col in columns if col not in ['name', 'mz', 'rt', 'list_2_match']]
-        print("bacterial_columns", bacterial_columns)
+        # print("bacterial_columns", bacterial_columns)
         if not bacterial_columns:
             logging.error("No bacterial columns found in the table: %s", table_name)
             return None
@@ -304,7 +381,7 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
 
         # Melt DataFrame to transform bacterial columns into rows
         df_melted = df.melt(id_vars=["name"], var_name="bacteria", value_name="value")
-        print('df_melted \n', df_melted)
+        # print('df_melted \n', df_melted)
         # Filter rows with non-null values
         df_filtered = df_melted[df_melted["value"].notnull()]
 
@@ -316,7 +393,7 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
         df_sorted = df_sorted.drop_duplicates(subset="bacteria", keep="first").head(top_n)
         
         logging.info(f"Fetched {len(df_sorted)} rows for {order.upper()} {top_n} values of compound: {selected_compound}.")
-        print('df_sorted', df_sorted)
+        # print('df_sorted', df_sorted)
         return df_sorted
 
     except Exception as e:

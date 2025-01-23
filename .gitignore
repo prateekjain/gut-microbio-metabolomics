@@ -12,3 +12,4 @@ appmap*
 *.xlsx
 *.log
 upload.py
+__pycache__
