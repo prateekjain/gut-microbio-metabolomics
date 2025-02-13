@@ -145,7 +145,7 @@ a:active { text-decoration: none; }
 
 .gmm-scatter-plot{
     height: 650px; /*  Set the desired height here */
-    width: 100%; /* Ensure scatter plot is wider than the container */
+    width: 1200px; /* Ensure scatter plot is wider than the container */
     margin-top: 20px;
 }
 .graph-container{

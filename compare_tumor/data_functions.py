@@ -266,7 +266,142 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
         if connection:
             connection.close()
 
-            
+ 
+
+def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
+    """
+    Fetches metabolites where ALL selected bacteria collectively rank among the top 10 producers.
+    """
+    logging.info("Fetching top metabolites for selected bacteria: %s", selected_bacteria)
+    if not selected_bacteria:
+        return None
+
+    try:
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+
+        # Fetch column names dynamically
+        cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
+        all_columns = [row[0] for row in cursor.fetchall()]
+        non_bacteria_columns = ["name", "mz", "rt", "list_2_match"]
+        bacteria_columns = [col for col in all_columns if col not in non_bacteria_columns]
+
+        # Modified query to check if ALL selected bacteria are in top 10
+        unpivot_query = " UNION ALL ".join(
+            [f"SELECT name AS metabolite, '{col}' AS bacteria, {col} AS value FROM {table_name}" for col in bacteria_columns]
+        )
+        query = f"""
+        WITH UnpivotedData AS (
+            {unpivot_query}
+        ),
+        RankedBacteria AS (
+            SELECT
+                metabolite,
+                bacteria,
+                value,
+                RANK() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
+            FROM UnpivotedData
+        ),
+        SelectedBacteriaRanks AS (
+            SELECT 
+                metabolite,
+                COUNT(*) as selected_bacteria_in_top_10
+            FROM RankedBacteria
+            WHERE bacteria = ANY(%s)
+            AND rank <= 10
+            GROUP BY metabolite
+            HAVING COUNT(*) = %s  -- Ensures ALL selected bacteria are in top 10
+        )
+        SELECT rb.*
+        FROM RankedBacteria rb
+        INNER JOIN SelectedBacteriaRanks sbr ON rb.metabolite = sbr.metabolite
+        WHERE rb.bacteria = ANY(%s)
+        ORDER BY rb.metabolite, rb.rank;
+        """
+        
+        cursor.execute(query, (selected_bacteria, len(selected_bacteria), selected_bacteria))
+        data = cursor.fetchall()
+
+        if not data:
+            logging.warning("Not all selected bacteria are in top 10 producers")
+            return None
+
+        columns = [desc[0] for desc in cursor.description]
+        df = pd.DataFrame(data, columns=columns)
+        return df
+
+    except Exception as e:
+        logging.error("Error fetching data: %s", e)
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_metabolite_data(table_name, metabolite):
+    """Fetch all bacteria values for a specific metabolite"""
+    try:
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+
+        # Get bacterial columns
+        cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
+        all_columns = [row[0] for row in cursor.fetchall()]
+        bacterial_columns = [col for col in all_columns if col not in ['name', 'mz', 'rt', 'list_2_match']]
+
+        # Create UNPIVOT query
+        unpivot_query = " UNION ALL ".join(
+            [f"SELECT name as metabolite, '{col}' as bacteria, {col} as value FROM {table_name}" 
+             for col in bacterial_columns]
+        )
+        
+        query = f"""
+        WITH unpivoted AS ({unpivot_query})
+        SELECT * FROM unpivoted WHERE metabolite = %s AND value IS NOT NULL
+        """
+        
+        cursor.execute(query, (metabolite,))
+        data = cursor.fetchall()
+        
+        return pd.DataFrame(data, columns=['metabolite', 'bacteria', 'value'])
+
+    except Exception as e:
+        logging.error("Error fetching metabolite data: %s", e)
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+def get_bacteria_data(table_name, bacteria):
+    """Fetch all metabolite values for a specific bacteria"""
+    try:
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        
+        query = f"""
+        SELECT name as metabolite, {bacteria} as value 
+        FROM {table_name} 
+        WHERE {bacteria} IS NOT NULL
+        """
+        
+        cursor.execute(query)
+        data = cursor.fetchall()
+        
+        df = pd.DataFrame(data, columns=['metabolite', 'value'])
+        df['bacteria'] = bacteria
+        return df
+
+    except Exception as e:
+        logging.error("Error fetching bacteria data: %s", e)
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()                       
             
 def get_column_names(table_name):
     """
@@ -793,125 +928,125 @@ def get_dropdown_options():
     return dropdown_options
 
 
-def forest_plot(selected_mz, regions):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-    table_name = "forest_plot"
+# def forest_plot(selected_mz, regions):
+#     connection = psycopg2.connect(db_url)
+#     cursor = connection.cursor()
+#     table_name = "forest_plot"
 
-    # Create a list to store dictionaries for all regions
-    result_list = []
-    # regions = ['cecum', 'ascending', 'transverse',
-    #            'descending', 'sigmoid', 'Rectosigmoid', 'Rectum']
+#     # Create a list to store dictionaries for all regions
+#     result_list = []
+#     # regions = ['cecum', 'ascending', 'transverse',
+#     #            'descending', 'sigmoid', 'Rectosigmoid', 'Rectum']
 
-    # Define custom colors foreach region
-    custom_colors = ['red', 'blue', 'green',
-                     'purple', 'orange', 'pink', 'brown']
+#     # Define custom colors foreach region
+#     custom_colors = ['red', 'blue', 'green',
+#                      'purple', 'orange', 'pink', 'brown']
 
-    # Iterate over regions
-    for region in regions:
-        hr_column = f'HR_{region}'
-        pvalue_column = f'Pvalue_{region}'
-        low_column = f'Low_{region}'
-        high_column = f'High_{region}'
+#     # Iterate over regions
+#     for region in regions:
+#         hr_column = f'HR_{region}'
+#         pvalue_column = f'Pvalue_{region}'
+#         low_column = f'Low_{region}'
+#         high_column = f'High_{region}'
 
-        # Execute SQL queries to fetch data for the current region and selected mz
-        cursor.execute(
-            f"SELECT {hr_column}, {low_column}, {high_column}, {pvalue_column} FROM {table_name} WHERE mz = %s", (selected_mz,))
-        result = cursor.fetchone()
+#         # Execute SQL queries to fetch data for the current region and selected mz
+#         cursor.execute(
+#             f"SELECT {hr_column}, {low_column}, {high_column}, {pvalue_column} FROM {table_name} WHERE mz = %s", (selected_mz,))
+#         result = cursor.fetchone()
 
-        if result:
-            # Calculate the HR value and its confidence interval
-            hr_value = result[0]
-            low_value = result[1]
-            high_value = result[2]
-            est_hr = f"{hr_value}({low_value} to {high_value})"
+#         if result:
+#             # Calculate the HR value and its confidence interval
+#             hr_value = result[0]
+#             low_value = result[1]
+#             high_value = result[2]
+#             est_hr = f"{hr_value}({low_value} to {high_value})"
 
-            # Create a dictionary for the current region
-            result_dict = {
-                'mz': selected_mz,
-                'region': region,
-                'HR': hr_value,
-                'Low': low_value,
-                'High': high_value,
-                'Pvalue': result[3],
-                'est_hr': est_hr,
-            }
+#             # Create a dictionary for the current region
+#             result_dict = {
+#                 'mz': selected_mz,
+#                 'region': region,
+#                 'HR': hr_value,
+#                 'Low': low_value,
+#                 'High': high_value,
+#                 'Pvalue': result[3],
+#                 'est_hr': est_hr,
+#             }
 
-        # Determine qFdrStars1 based on Pvalue
-        if result[3] <= 0.001:
-            result_dict['Pval'] = '***'
-        elif 0.001 < result[3] <= 0.01:
-            result_dict['Pval'] = '**'
-        elif 0.01 < result[3] <= 0.05:
-            result_dict['Pval'] = '*'
-        else:
-            result_dict['Pval'] = ''
+#         # Determine qFdrStars1 based on Pvalue
+#         if result[3] <= 0.001:
+#             result_dict['Pval'] = '***'
+#         elif 0.001 < result[3] <= 0.01:
+#             result_dict['Pval'] = '**'
+#         elif 0.01 < result[3] <= 0.05:
+#             result_dict['Pval'] = '*'
+#         else:
+#             result_dict['Pval'] = ''
 
-        # print(result[3])
-        result_list.append(result_dict)
+#         # print(result[3])
+#         result_list.append(result_dict)
 
-    # print("result", result_list)
-    # result_list = sorted(result_list)
-    return result_list
+#     # print("result", result_list)
+#     # result_list = sorted(result_list)
+#     return result_list
 
 
-def forest_plot_rcc_lcc(selected_mz, regions):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-    table_name = "forest_rcc_lcc_plot"
+# def forest_plot_rcc_lcc(selected_mz, regions):
+#     connection = psycopg2.connect(db_url)
+#     cursor = connection.cursor()
+#     table_name = "forest_rcc_lcc_plot"
 
-    # Create a list to store dictionaries for all regions
-    result_list = []
-    # regions = ['cecum', 'ascending', 'transverse',
-    #            'descending', 'sigmoid', 'Rectosigmoid', 'Rectum']
+#     # Create a list to store dictionaries for all regions
+#     result_list = []
+#     # regions = ['cecum', 'ascending', 'transverse',
+#     #            'descending', 'sigmoid', 'Rectosigmoid', 'Rectum']
 
-    # Define custom colors foreach region
-    custom_colors = ['red', 'blue', 'green',
-                     'purple', 'orange', 'pink', 'brown']
+#     # Define custom colors foreach region
+#     custom_colors = ['red', 'blue', 'green',
+#                      'purple', 'orange', 'pink', 'brown']
 
-    # Iterate over regions
-    for region in regions:
-        hr_column = f'HR_{region}'
-        pvalue_column = f'Pvalue_{region}'
-        low_column = f'Low_{region}'
-        high_column = f'High_{region}'
+#     # Iterate over regions
+#     for region in regions:
+#         hr_column = f'HR_{region}'
+#         pvalue_column = f'Pvalue_{region}'
+#         low_column = f'Low_{region}'
+#         high_column = f'High_{region}'
 
-        # Execute SQL queries to fetch data for the current region and selected mz
-        cursor.execute(
-            f"SELECT {hr_column}, {low_column}, {high_column}, {pvalue_column} FROM {table_name} WHERE mz = %s", (selected_mz,))
-        result = cursor.fetchone()
+#         # Execute SQL queries to fetch data for the current region and selected mz
+#         cursor.execute(
+#             f"SELECT {hr_column}, {low_column}, {high_column}, {pvalue_column} FROM {table_name} WHERE mz = %s", (selected_mz,))
+#         result = cursor.fetchone()
 
-        if result:
-            # Calculate the HR value and its confidence interval
-            hr_value = result[0]
-            low_value = result[1]
-            high_value = result[2]
-            est_hr = f"{hr_value}({low_value} to {high_value})"
+#         if result:
+#             # Calculate the HR value and its confidence interval
+#             hr_value = result[0]
+#             low_value = result[1]
+#             high_value = result[2]
+#             est_hr = f"{hr_value}({low_value} to {high_value})"
 
-            # Create a dictionary for the current region
-            result_dict = {
-                'mz': selected_mz,
-                'region': region,
-                'HR': hr_value,
-                'Low': low_value,
-                'High': high_value,
-                'Pvalue': result[3],
-                'est_hr': est_hr,
-            }
+#             # Create a dictionary for the current region
+#             result_dict = {
+#                 'mz': selected_mz,
+#                 'region': region,
+#                 'HR': hr_value,
+#                 'Low': low_value,
+#                 'High': high_value,
+#                 'Pvalue': result[3],
+#                 'est_hr': est_hr,
+#             }
 
-        # Determine qFdrStars1 based on Pvalue
-        if result[3] <= 0.001:
-            result_dict['Pval'] = '***'
-        elif 0.001 < result[3] <= 0.01:
-            result_dict['Pval'] = '**'
-        elif 0.01 < result[3] <= 0.05:
-            result_dict['Pval'] = '*'
-        else:
-            result_dict['Pval'] = ''
+#         # Determine qFdrStars1 based on Pvalue
+#         if result[3] <= 0.001:
+#             result_dict['Pval'] = '***'
+#         elif 0.001 < result[3] <= 0.01:
+#             result_dict['Pval'] = '**'
+#         elif 0.01 < result[3] <= 0.05:
+#             result_dict['Pval'] = '*'
+#         else:
+#             result_dict['Pval'] = ''
 
-        # print(result[3])
-        result_list.append(result_dict)
+#         # print(result[3])
+#         result_list.append(result_dict)
 
-    # print("result", result_list)
-    # result_list = sorted(result_list)
-    return result_list
+#     # print("result", result_list)
+#     # result_list = sorted(result_list)
+#     return result_list
