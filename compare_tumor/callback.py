@@ -215,13 +215,17 @@ def register_callbacks(app):
                 template="plotly_white",
                 width=scatter_width,
                 xaxis=dict(
+                    tickvals=list(range(len(x_axis))),
                     tickangle=90,
                     tickfont=dict(size=max(12, 100 // len(x_axis.unique()))),
                     automargin=True,
                     minor=dict(ticks='outside'),
                     ticks='outside',
                     ticklen=5,
-                    
+                    range=[0, None],
+                    zeroline=True,
+                    zerolinewidth=1,
+                    zerolinecolor='black',
                 ),
                 yaxis=dict(
                     tickfont=dict(color='black'),
@@ -232,6 +236,9 @@ def register_callbacks(app):
                     minor=dict(ticks='outside'),
                     ticks='outside',
                     ticklen=5,
+                    zeroline=True,
+                    zerolinewidth=1,
+                    zerolinecolor='black',
                 ),
                 margin=dict(l=100, r=100, t=50, b=50),
             )
