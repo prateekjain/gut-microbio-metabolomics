@@ -270,7 +270,8 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
     """
-    Fetches metabolites where ALL selected bacteria collectively rank among the top 10 producers.
+    Fetches metabolites where ALL selected bacteria appear in the top 10 producers,
+    even if they appear in different metabolites.
     """
     logging.info("Fetching top metabolites for selected bacteria: %s", selected_bacteria)
     if not selected_bacteria:
@@ -286,49 +287,75 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
         non_bacteria_columns = ["name", "mz", "rt", "list_2_match"]
         bacteria_columns = [col for col in all_columns if col not in non_bacteria_columns]
 
-        # Modified query to check if ALL selected bacteria are in top 10
-        unpivot_query = " UNION ALL ".join(
-            [f"SELECT name AS metabolite, '{col}' AS bacteria, {col} AS value FROM {table_name}" for col in bacteria_columns]
-        )
-        query = f"""
+        # First get all top 10 data into a DataFrame
+        # First get all top 10 data into a DataFrame
+        base_query = f"""
         WITH UnpivotedData AS (
-            {unpivot_query}
+            {" UNION ALL ".join([f"SELECT DISTINCT name AS metabolite, '{col}' AS bacteria, {col} AS value FROM {table_name}" 
+                                for col in bacteria_columns])}
         ),
         RankedBacteria AS (
-            SELECT
+            SELECT DISTINCT ON (metabolite, bacteria)
                 metabolite,
                 bacteria,
                 value,
-                RANK() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
+                ROW_NUMBER() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
             FROM UnpivotedData
+            WHERE value > 0  -- Only consider non-zero values
         ),
-        SelectedBacteriaRanks AS (
-            SELECT 
+        Top10Distinct AS (
+            SELECT DISTINCT
                 metabolite,
-                COUNT(*) as selected_bacteria_in_top_10
+                bacteria,
+                value,
+                rank
             FROM RankedBacteria
-            WHERE bacteria = ANY(%s)
-            AND rank <= 10
-            GROUP BY metabolite
-            HAVING COUNT(*) = %s  -- Ensures ALL selected bacteria are in top 10
+            WHERE rank <= 10
         )
-        SELECT rb.*
-        FROM RankedBacteria rb
-        INNER JOIN SelectedBacteriaRanks sbr ON rb.metabolite = sbr.metabolite
-        WHERE rb.bacteria = ANY(%s)
-        ORDER BY rb.metabolite, rb.rank;
+        SELECT 
+            metabolite,
+            bacteria,
+            value,
+            rank
+        FROM Top10Distinct
+        ORDER BY metabolite, rank;
         """
         
-        cursor.execute(query, (selected_bacteria, len(selected_bacteria), selected_bacteria))
-        data = cursor.fetchall()
+        cursor.execute(base_query)
+        columns = ['metabolite', 'bacteria', 'value', 'rank']
+        top_10_df = pd.DataFrame(cursor.fetchall(), columns=columns)
 
-        if not data:
-            logging.warning("Not all selected bacteria are in top 10 producers")
+        # Print the top 10 producers for each metabolite
+        print("\nTop 10 Bacteria Producers for each Metabolite:")
+        print("=" * 50)
+        for metabolite in top_10_df['metabolite'].unique():
+            bacteria_list = top_10_df[top_10_df['metabolite'] == metabolite]['bacteria'].tolist()
+            print(f"\nMetabolite: {metabolite}")
+            print(f"Top 10 Producers: {', '.join(bacteria_list)}")
+        print("=" * 50)
+
+        # Check if all selected bacteria are in top 10 of any metabolite
+        selected_bacteria_in_top10 = set(selected_bacteria) & set(top_10_df['bacteria'].unique())
+        
+        if len(selected_bacteria_in_top10) != len(selected_bacteria):
+            logging.warning("Some selected bacteria are not in top 10 producers of any metabolite")
             return None
 
-        columns = [desc[0] for desc in cursor.description]
-        df = pd.DataFrame(data, columns=columns)
-        return df
+        # Filter data for selected bacteria
+        result_df = top_10_df[top_10_df['bacteria'].isin(selected_bacteria)]
+        
+        if result_df.empty:
+            logging.warning("No data found for selected bacteria")
+            return None
+
+        # Debug information
+        print("\nSelected bacteria found in these metabolites:")
+        for metabolite in result_df['metabolite'].unique():
+            bacteria_ranks = result_df[result_df['metabolite'] == metabolite][['bacteria', 'rank']].values
+            print(f"\nMetabolite: {metabolite}")
+            print("Bacteria and their ranks:", bacteria_ranks)
+
+        return result_df
 
     except Exception as e:
         logging.error("Error fetching data: %s", e)
@@ -338,6 +365,7 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
             cursor.close()
         if connection:
             connection.close()
+
 
 def get_metabolite_data(table_name, metabolite):
     """Fetch all bacteria values for a specific metabolite"""

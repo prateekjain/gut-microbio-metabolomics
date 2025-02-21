@@ -223,9 +223,7 @@ def register_callbacks(app):
                     ticks='outside',
                     ticklen=5,
                     range=[0, None],
-                    zeroline=True,
-                    zerolinewidth=1,
-                    zerolinecolor='black',
+                    
                 ),
                 yaxis=dict(
                     tickfont=dict(color='black'),
@@ -358,48 +356,120 @@ def register_callbacks(app):
             logging.error("Error in callback: %s", e)
             return go.Figure()
 
+    
     @app.callback(
         Output("gmm-scatter-cumm-top-plot", "figure"),
         [Input("selected-bacteria-cum-top", "value")],
     )
     def update_scatter_top_plot(selected_bacteria):
         logging.info(f"Triggered callback with bacteria: {selected_bacteria}")
-
         table_name = "gmm_test_1"
 
         try:
-            if not selected_bacteria:
-                return create_empty_figure("No Bacteria Selected", 
-                                        "Please select bacteria from the dropdown to view the plot.")
+            # Check for minimum 2 bacteria selection
+            if not selected_bacteria or len(selected_bacteria) < 2:
+                return create_empty_figure(
+                    "Insufficient Selection", 
+                    "Please select at least 2 bacteria to compare their collective presence in top producers."
+                )
 
             df = get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria)
 
             if df is None or df.empty:
-                return create_empty_figure("No Matching Data", 
-                                        "The selected bacteria are not collectively in the top 10 producers for any metabolite.")
+                return create_empty_figure(
+                    "No Matching Data", 
+                    f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite."
+                )
 
-            # Create scatter plot
+            # Create scatter plot with improvements
             fig = go.Figure()
 
-            for bacteria, group in df.groupby("bacteria"):
+            # Sort metabolites by average value to improve readability
+            # Modified to handle duplicates
+            metabolite_order = (df.groupby('metabolite')['value']
+                            .mean()
+                            .sort_values(ascending=False)
+                            .index.unique())  # Add unique() to handle duplicates
+
+            bacteria_list = sorted(df['bacteria'].unique())
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+            color_map = dict(zip(bacteria_list, colors[:len(bacteria_list)]))
+
+            for bacteria in bacteria_list:
+                group = df[df['bacteria'] == bacteria]
+                
+                # Modified to handle duplicates without reindexing
+                group = group.sort_values('metabolite').drop_duplicates(['metabolite', 'bacteria'])
+                
                 fig.add_trace(
                     go.Scatter(
                         x=group["metabolite"],
                         y=group["value"],
-                        mode="markers",
-                        marker=dict(size=10),
-                        name=bacteria,
+                        mode="markers+lines",
+                        marker=dict(
+                            size=12,
+                            symbol='circle',
+                            color=color_map[bacteria],
+                            line=dict(width=1, color='white')
+                        ),
+                        name=bacteria.replace('_', ' ').title(),
+                        hovertemplate=(
+                            "<b>Bacteria:</b> %{fullData.name}<br>" +
+                            "<b>Metabolite:</b> %{x}<br>" +
+                            "<b>Value:</b> %{y:.2f}<br>" +
+                            "<extra></extra>"
+                        )
                     )
                 )
 
+            scatter_width = max(1000, len(metabolite_order) * 50)
+            
+            # Rest of the layout remains the same
             fig.update_layout(
-                title="Metabolites where Selected Bacteria are Collectively in Top 10 Producers",
+                title={
+                    'text': "Metabolites where Selected Bacteria are Collectively in Top 10 Producers",
+                    'y':0.95,
+                    'x':0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top'
+                },
                 xaxis_title="Metabolite",
                 yaxis_title="Value",
                 template="plotly_white",
-                xaxis=dict(tickangle=90, showgrid=True),
-                yaxis=dict(showgrid=True),
-                legend_title="Bacteria",
+                width=scatter_width,
+                height=600,
+                showlegend=True,
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="right",
+                    x=0.99,
+                    bgcolor='rgba(255, 255, 255, 0.8)'
+                ),
+                xaxis=dict(
+                    tickangle=45,
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='lightgray',
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black',
+                    tickfont=dict(size=10),
+                    range=[-0.5, len(metabolite_order) - 0.5]
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='lightgray',
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black',
+                    zeroline=True,
+                    zerolinewidth=1,
+                    zerolinecolor='black'
+                ),
+                plot_bgcolor='white'
             )
 
             return fig
