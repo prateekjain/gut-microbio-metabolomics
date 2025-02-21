@@ -406,7 +406,7 @@ def register_callbacks(app):
                     go.Scatter(
                         x=group["metabolite"],
                         y=group["value"],
-                        mode="markers+lines",
+                        mode="markers",
                         marker=dict(
                             size=12,
                             symbol='circle',
@@ -442,9 +442,9 @@ def register_callbacks(app):
                 showlegend=True,
                 legend=dict(
                     yanchor="top",
-                    y=0.99,
+                    y=1,
                     xanchor="right",
-                    x=0.99,
+                    x=1.15,
                     bgcolor='rgba(255, 255, 255, 0.8)'
                 ),
                 xaxis=dict(
@@ -522,7 +522,6 @@ def register_callbacks(app):
             logging.error("Error fetching data: %s", e)
             return go.Figure()
 
-        # print('First DataFrame:', df)
         
         # Filter data based on selected metabolites and bacteria
         try:
