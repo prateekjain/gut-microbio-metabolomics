@@ -244,7 +244,7 @@ def register_callbacks(app):
                     automargin=True,
                     ticks='outside',
                     ticklen=5,
-                    range= [0, len(x_axis.unique())]
+                    range= [-0.1, len(x_axis.unique())]
                 ),
                 yaxis=dict(
                     tickfont=dict(color='black'),
