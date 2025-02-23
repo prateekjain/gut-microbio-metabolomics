@@ -215,15 +215,12 @@ def register_callbacks(app):
                 template="plotly_white",
                 width=scatter_width,
                 xaxis=dict(
-                    tickvals=list(range(len(x_axis))),
                     tickangle=90,
                     tickfont=dict(size=max(12, 100 // len(x_axis.unique()))),
                     automargin=True,
-                    minor=dict(ticks='outside'),
                     ticks='outside',
                     ticklen=5,
-                    range=[0, None],
-                    
+                    range= [0, len(x_axis.unique())]
                 ),
                 yaxis=dict(
                     tickfont=dict(color='black'),
@@ -238,7 +235,13 @@ def register_callbacks(app):
                     zerolinewidth=1,
                     zerolinecolor='black',
                 ),
-                margin=dict(l=100, r=100, t=50, b=50),
+                margin=dict(
+                    l=50,   # left margin
+                    r=50,   # right margin
+                    b=150,  # bottom margin - increased to accommodate labels
+                    t=50,   # top margin
+                    pad=4   # padding between axis and labels
+                ),
             )
 
             return selected_metabolite, selected_bacteria, fig
@@ -246,6 +249,8 @@ def register_callbacks(app):
         except Exception as e:
             logging.error("Error in callback: %s", e)
             return None, None, create_empty_figure("Error", str(e))
+
+
 
     @app.callback(
         Output("gmm-scatter-top-plot", "figure"),
