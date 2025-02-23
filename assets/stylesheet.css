@@ -152,8 +152,8 @@ a:active { text-decoration: none; }
 } */
 
 .gmm-scatter-plot{
-    height: 650px; /*  Set the desired height here */
-    width: 1200px; /* Ensure scatter plot is wider than the container */
+    height: 600px; /* Set a fixed height for the plot */
+    width: 1200px;
     margin-top: 20px;
 }
 .graph-container{
@@ -374,23 +374,19 @@ a:active { text-decoration: none; }
 .outer-container {
     width: 80%;
     padding: 20px;
-    
     margin: 0 auto;
     box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
     border-radius: 8px;
     overflow-y: auto;
-    overflow-x: auto; 
-    /* white-space: nowrap; */
+    overflow-x: auto;
     box-sizing: border-box;
     position: relative;
-    /* overflow: hidden; Ensure the container doesn't scroll */
-    
+    min-height: 650px; /* Add a minimum height to the outer container */
 }
 .scatter-container {
-    width: auto; /* Automatically adjust based on content width */
-    height: 600px; /* Set a fixed height for the scrollable container */
-    /* overflow-y: auto; Enable vertical scrolling */
-    overflow-x: auto;/*  Prevent horizontal scrolling */
+    width: auto;
+    height: 600px;
+    overflow-x: auto;
     margin: 0 auto;
 }
 
