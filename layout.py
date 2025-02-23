@@ -725,6 +725,17 @@ main_layout = dbc.Container(
                             style={"width": "100%"},
                             className="select-input",
                         ),
+                        dbc.RadioItems(
+                            id="top-bottom-radio",
+                            options=[
+                                {"label": "All", "value": "all"},
+                                {"label": "Top 10", "value": "top"},
+                                {"label": "Bottom 10", "value": "bottom"}
+                            ],
+                            value="all",
+                            inline=True,
+                            className="select-input",
+                        ),
                         html.Label("Select Bacteria:", className="select-label"),
                         dcc.Dropdown(
                             id="selected-bacteria-gmm",

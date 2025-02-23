@@ -156,9 +156,10 @@ def register_callbacks(app):
         Output("selected-bacteria-gmm", "value"),
         Output("gmm-scatter-plot", "figure")],
         [Input("selected-metabolite-gmm", "value"),
-        Input("selected-bacteria-gmm", "value")]
+        Input("selected-bacteria-gmm", "value"),
+        Input("top-bottom-radio", "value")] 
     )
-    def update_scatter_plot(selected_metabolite, selected_bacteria):
+    def update_scatter_plot(selected_metabolite, selected_bacteria, top_bottom):
         ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
         
@@ -166,15 +167,38 @@ def register_callbacks(app):
         table_name = "gmm_test_1"
 
         try:
-            # Reset other dropdown based on which was triggered
+        # Initialize variables
+            df = None
+            plot_type = None
+
+            # Handle dropdown triggers
             if triggered_id == "selected-metabolite-gmm" and selected_metabolite:
                 selected_bacteria = None  # Reset bacteria dropdown
-                df = get_metabolite_data(table_name, selected_metabolite)
                 plot_type = "metabolite"
+                
+                # Apply radio button filter for metabolite view
+                if top_bottom == "top":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                elif top_bottom == "bottom":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                else:  # "all"
+                    df = get_metabolite_data(table_name, selected_metabolite)
+
             elif triggered_id == "selected-bacteria-gmm" and selected_bacteria:
                 selected_metabolite = None  # Reset metabolite dropdown
-                df = get_bacteria_data(table_name, selected_bacteria)
                 plot_type = "bacteria"
+                df = get_bacteria_data(table_name, selected_bacteria)
+                # Note: Radio buttons don't affect bacteria view as per current logic
+                
+            # Handle radio button trigger
+            elif triggered_id == "top-bottom-radio" and selected_metabolite:
+                plot_type = "metabolite"
+                if top_bottom == "top":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                elif top_bottom == "bottom":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                else:  # "all"
+                    df = get_metabolite_data(table_name, selected_metabolite)
             else:
                 return None, None, create_empty_figure("No Selection", 
                                                     "Please select either a metabolite or bacteria")

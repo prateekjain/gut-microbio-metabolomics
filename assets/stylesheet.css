@@ -88,6 +88,14 @@ a:active { text-decoration: none; }
   padding: 10px 20px;
 }
 
+.select-input {
+    width: 80%;
+    padding: 10px;
+    font-size: 16px;
+    margin-left: 7.5%;
+    margin-bottom: 10px;
+}
+
 .header-title {
   margin: 0;
 }
