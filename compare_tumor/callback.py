@@ -377,6 +377,20 @@ def register_callbacks(app):
                 xaxis=dict(tickangle=90, showgrid=True),
                 yaxis=dict(showgrid=True),
                 legend_title="Bacteria",
+                showlegend=True,  # Force show legend
+                legend=dict(
+                    y=1.15,
+                    x=1,
+                    bgcolor='rgba(255, 255, 255, 0.8)',  # Optional: add background to legend
+                    bordercolor='rgba(0,0,0,0.1)',
+                    borderwidth=1
+                ),
+                margin=dict(
+                    t=100,  # Increase top margin to accommodate legend
+                    b=50,
+                    l=50,
+                    r=50
+                )
             )
 
             return fig
