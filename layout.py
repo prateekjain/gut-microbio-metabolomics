@@ -781,7 +781,7 @@ main_layout = dbc.Container(
                         ]
                     ),
                     dcc.Tab(
-                        label="Tab B",
+                        label="RPLC_Pos",
                         value="tab-b",
                         children=[
                             dbc.Row([
