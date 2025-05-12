@@ -709,70 +709,148 @@ main_layout = dbc.Container(
                     "Something to write here.",
                     className="section-description",
                 ),
-                dbc.Row([
-                    dbc.Col([
-                        html.Label("Select Metabolite:", className="select-label"),
-                        dcc.Dropdown(
-                            id="selected-metabolite-gmm",
-                            options=[
-                                {"label": name, "value": name}
-                                for name in list(get_gmm_name("gmm_test_1"))
-                            ],
-                            placeholder="Select Metabolite",
-                            searchable=True,
-                            clearable=True,
-                            multi=False,
-                            style={"width": "100%"},
-                            className="select-input",
-                        ),
-                        dbc.RadioItems(
-                            id="top-bottom-radio",
-                            options=[
-                                {"label": "All", "value": "all"},
-                                {"label": "Top 10", "value": "top"},
-                                {"label": "Bottom 10", "value": "bottom"}
-                            ],
-                            value="all",
-                            inline=True,
-                            className="select-input",
-                        ),
-                        html.Label("Select Bacteria:", className="select-label"),
-                        dcc.Dropdown(
-                            id="selected-bacteria-gmm",
-                            options=[
-                                {"label": name, "value": name}
-                                for name in list(get_column_names("gmm_test_1"))
-                            ],
-                            placeholder="Select Bacteria",
-                            searchable=True,
-                            clearable=True,
-                            multi=False,
-                            style={"width": "100%"},
-                            className="select-input",
-                        ),
-                        dcc.Loading(
-                            id="outer-container-plus-loading",
-                            type="circle",
-                            children=[
-                                html.Div([
-                                    html.Div(
-                                        id="selected-gmm-value",
-                                        className="select-label",
+                dcc.Tabs([
+                    dcc.Tab(
+                        label="Tab A",
+                        value="tab-a",
+                        children=[
+                            dbc.Row([
+                                dbc.Col([
+                                    html.Label("Select Metabolite:", className="select-label"),
+                                    dcc.Dropdown(
+                                        id="selected-metabolite-gmm-a",
+                                        options=[
+                                            {"label": name, "value": name}
+                                            for name in list(get_gmm_name("gmm_test_1"))
+                                        ],
+                                        placeholder="Select Metabolite",
+                                        searchable=True,
+                                        clearable=True,
+                                        multi=False,
+                                        style={"width": "100%"},
+                                        className="select-input",
                                     ),
-                                    html.Div(
-                                        dcc.Graph(
-                                            id='gmm-scatter-plot',
-                                            className="gmm-scatter-plot",
-                                        ),
-                                        className="scatter-container",
+                                    dbc.RadioItems(
+                                        id="top-bottom-radio-a",
+                                        options=[
+                                            {"label": "All", "value": "all"},
+                                            {"label": "Top 10", "value": "top"},
+                                            {"label": "Bottom 10", "value": "bottom"}
+                                        ],
+                                        value="all",
+                                        inline=True,
+                                        className="select-input",
                                     ),
-                                ],
-                                className="outer-container",
-                                ),
-                            ],
-                        ),
-                    ], md=12),
-                ]),
+                                    html.Label("Select Bacteria:", className="select-label"),
+                                    dcc.Dropdown(
+                                        id="selected-bacteria-gmm-a",
+                                        options=[
+                                            {"label": name, "value": name}
+                                            for name in list(get_column_names("gmm_test_1"))
+                                        ],
+                                        placeholder="Select Bacteria",
+                                        searchable=True,
+                                        clearable=True,
+                                        multi=False,
+                                        style={"width": "100%"},
+                                        className="select-input",
+                                    ),
+                                    dcc.Loading(
+                                        id="outer-container-plus-loading-a",
+                                        type="circle",
+                                        children=[
+                                            html.Div([
+                                                html.Div(
+                                                    id="selected-gmm-value-a",
+                                                    className="select-label",
+                                                ),
+                                                html.Div(
+                                                    dcc.Graph(
+                                                        id='gmm-scatter-plot-a',
+                                                        className="gmm-scatter-plot",
+                                                    ),
+                                                    className="scatter-container",
+                                                ),
+                                            ],
+                                            className="outer-container",
+                                            ),
+                                        ],
+                                    ),
+                                ], md=12),
+                            ]),
+                        ]
+                    ),
+                    dcc.Tab(
+                        label="Tab B",
+                        value="tab-b",
+                        children=[
+                            dbc.Row([
+                                dbc.Col([
+                                    html.Label("Select Metabolite:", className="select-label"),
+                                    dcc.Dropdown(
+                                        id="selected-metabolite-gmm-b",
+                                        options=[
+                                            {"label": name, "value": name}
+                                            for name in list(get_gmm_name("rplc"))
+                                        ],
+                                        placeholder="Select Metabolite",
+                                        searchable=True,
+                                        clearable=True,
+                                        multi=False,
+                                        style={"width": "100%"},
+                                        className="select-input",
+                                    ),
+                                    dbc.RadioItems(
+                                        id="top-bottom-radio-b",
+                                        options=[
+                                            {"label": "All", "value": "all"},
+                                            {"label": "Top 10", "value": "top"},
+                                            {"label": "Bottom 10", "value": "bottom"}
+                                        ],
+                                        value="all",
+                                        inline=True,
+                                        className="select-input",
+                                    ),
+                                    html.Label("Select Bacteria:", className="select-label"),
+                                    dcc.Dropdown(
+                                        id="selected-bacteria-gmm-b",
+                                        options=[
+                                            {"label": name, "value": name}
+                                            for name in list(get_column_names("rplc"))
+                                        ],
+                                        placeholder="Select Bacteria",
+                                        searchable=True,
+                                        clearable=True,
+                                        multi=False,
+                                        style={"width": "100%"},
+                                        className="select-input",
+                                    ),
+                                    dcc.Loading(
+                                        id="outer-container-plus-loading-b",
+                                        type="circle",
+                                        children=[
+                                            html.Div([
+                                                html.Div(
+                                                    id="selected-gmm-value-b",
+                                                    className="select-label",
+                                                ),
+                                                html.Div(
+                                                    dcc.Graph(
+                                                        id='gmm-scatter-plot-b',
+                                                        className="gmm-scatter-plot",
+                                                    ),
+                                                    className="scatter-container",
+                                                ),
+                                            ],
+                                            className="outer-container",
+                                            ),
+                                        ],
+                                    ),
+                                ], md=12),
+                            ]),
+                        ]
+                    ),
+                ], id="section1-tabs", value="tab-a", className="tabs"),
                 html.Div(className="border-line"),
                 dbc.Row(
                     [

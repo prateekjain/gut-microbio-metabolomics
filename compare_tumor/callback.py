@@ -115,6 +115,252 @@ def register_callbacks(app):
 
 # Callback to update the displayed mz value
 
+    @app.callback(
+        [Output("selected-metabolite-gmm-b", "value"),
+        Output("selected-bacteria-gmm-b", "value"),
+        Output("gmm-scatter-plot-b", "figure")],
+        [Input("selected-metabolite-gmm-b", "value"),
+        Input("selected-bacteria-gmm-b", "value"),
+        Input("top-bottom-radio-b", "value")] 
+    )
+    def update_scatter_plot_b(selected_metabolite, selected_bacteria, top_bottom):
+        ctx = dash.callback_context
+        triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+        
+        logging.info(f"Triggered by (Tab B): {triggered_id}")
+        table_name = "rplc"  # Use the new table
+
+        try:
+            # Initialize variables
+            df = None
+            plot_type = None
+
+            # Handle dropdown triggers
+            if triggered_id == "selected-metabolite-gmm-b" and selected_metabolite:
+                selected_bacteria = None  # Reset bacteria dropdown
+                plot_type = "metabolite"
+                
+                # Apply radio button filter for metabolite view
+                if top_bottom == "top":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                elif top_bottom == "bottom":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                else:  # "all"
+                    df = get_metabolite_data(table_name, selected_metabolite)
+
+            elif triggered_id == "selected-bacteria-gmm-b" and selected_bacteria:
+                selected_metabolite = None  # Reset metabolite dropdown
+                plot_type = "bacteria"
+                df = get_bacteria_data(table_name, selected_bacteria)
+                
+            # Handle radio button trigger
+            elif triggered_id == "top-bottom-radio-b" and selected_metabolite:
+                plot_type = "metabolite"
+                if top_bottom == "top":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                elif top_bottom == "bottom":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                else:  # "all"
+                    df = get_metabolite_data(table_name, selected_metabolite)
+            else:
+                return None, None, create_empty_figure("No Selection", 
+                                                    "Please select either a metabolite or bacteria")
+
+            if df is None or df.empty:
+                return (selected_metabolite, selected_bacteria, 
+                    create_empty_figure("No Data", "No data available for selection"))
+
+            # Create figure based on plot type
+            fig = go.Figure()
+            
+            if plot_type == "metabolite":
+                x_axis = df["bacteria"].str.replace("_", " ").str.upper()
+                y_axis = df["value"]
+                x_title = "Bacteria"
+                title = f"Values for Metabolite: {selected_metabolite}"
+            else:  # bacteria
+                x_axis = df["metabolite"].str.replace("_", " ").str.upper()
+                y_axis = df["value"]
+                x_title = "Metabolite"
+                title = f"Values for Bacteria: {selected_bacteria}"
+
+            scatter_width = max(1000, len(x_axis.unique()) * 20)
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x_axis,
+                    y=y_axis,
+                    mode="markers",
+                    marker=dict(size=max(5, 100 // len(x_axis.unique())), color="#1D78B4"),
+                )
+            )
+
+            fig.update_layout(
+                title=title,
+                xaxis_title=x_title,
+                yaxis_title="Values",
+                template="plotly_white",
+                width=scatter_width,
+                xaxis=dict(
+                    tickangle=90,
+                    tickfont=dict(size=max(12, 100 // len(x_axis.unique()))),
+                    automargin=True,
+                    ticks='outside',
+                    ticklen=5,
+                    range= [-0.1, len(x_axis.unique())]
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='black'),
+                    showline=True,
+                    linecolor='black',
+                    linewidth=0.1,
+                    automargin=True,
+                    minor=dict(ticks='outside'),
+                    ticks='outside',
+                    ticklen=5,
+                    zeroline=True,
+                    zerolinewidth=1,
+                    zerolinecolor='black',
+                ),
+                margin=dict(
+                    l=50,   # left margin
+                    r=50,   # right margin
+                    b=150,  # bottom margin - increased to accommodate labels
+                    t=50,   # top margin
+                    pad=4   # padding between axis and labels
+                ),
+            )
+
+            return selected_metabolite, selected_bacteria, fig
+
+        except Exception as e:
+            logging.error("Error in callback: %s", e)
+            return None, None, create_empty_figure("Error", str(e))
+        
+        
+    @app.callback(
+        [Output("selected-metabolite-gmm-a", "value"),
+        Output("selected-bacteria-gmm-a", "value"),
+        Output("gmm-scatter-plot-a", "figure")],
+        [Input("selected-metabolite-gmm-a", "value"),
+        Input("selected-bacteria-gmm-a", "value"),
+        Input("top-bottom-radio-a", "value")] 
+    )
+    def update_scatter_plot_a(selected_metabolite, selected_bacteria, top_bottom):
+        ctx = dash.callback_context
+        triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+        
+        logging.info(f"Triggered by (Tab A): {triggered_id}")
+        table_name = "gmm_test_1"  # Use the original table for Tab A
+
+        try:
+            # Initialize variables
+            df = None
+            plot_type = None
+
+            # Handle dropdown triggers
+            if triggered_id == "selected-metabolite-gmm-a" and selected_metabolite:
+                selected_bacteria = None  # Reset bacteria dropdown
+                plot_type = "metabolite"
+                
+                # Apply radio button filter for metabolite view
+                if top_bottom == "top":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                elif top_bottom == "bottom":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                else:  # "all"
+                    df = get_metabolite_data(table_name, selected_metabolite)
+
+            elif triggered_id == "selected-bacteria-gmm-a" and selected_bacteria:
+                selected_metabolite = None  # Reset metabolite dropdown
+                plot_type = "bacteria"
+                df = get_bacteria_data(table_name, selected_bacteria)
+                
+            # Handle radio button trigger
+            elif triggered_id == "top-bottom-radio-a" and selected_metabolite:
+                plot_type = "metabolite"
+                if top_bottom == "top":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                elif top_bottom == "bottom":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                else:  # "all"
+                    df = get_metabolite_data(table_name, selected_metabolite)
+            else:
+                return None, None, create_empty_figure("No Selection", 
+                                                    "Please select either a metabolite or bacteria")
+
+            if df is None or df.empty:
+                return (selected_metabolite, selected_bacteria, 
+                    create_empty_figure("No Data", "No data available for selection"))
+
+            # Create figure based on plot type
+            fig = go.Figure()
+            
+            if plot_type == "metabolite":
+                x_axis = df["bacteria"].str.replace("_", " ").str.upper()
+                y_axis = df["value"]
+                x_title = "Bacteria"
+                title = f"Values for Metabolite: {selected_metabolite}"
+            else:  # bacteria
+                x_axis = df["metabolite"].str.replace("_", " ").str.upper()
+                y_axis = df["value"]
+                x_title = "Metabolite"
+                title = f"Values for Bacteria: {selected_bacteria}"
+
+            scatter_width = max(1000, len(x_axis.unique()) * 20)
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x_axis,
+                    y=y_axis,
+                    mode="markers",
+                    marker=dict(size=max(5, 100 // len(x_axis.unique())), color="#1D78B4"),
+                )
+            )
+
+            fig.update_layout(
+                title=title,
+                xaxis_title=x_title,
+                yaxis_title="Values",
+                template="plotly_white",
+                width=scatter_width,
+                xaxis=dict(
+                    tickangle=90,
+                    tickfont=dict(size=max(12, 100 // len(x_axis.unique()))),
+                    automargin=True,
+                    ticks='outside',
+                    ticklen=5,
+                    range= [-0.1, len(x_axis.unique())]
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='black'),
+                    showline=True,
+                    linecolor='black',
+                    linewidth=0.1,
+                    automargin=True,
+                    minor=dict(ticks='outside'),
+                    ticks='outside',
+                    ticklen=5,
+                    zeroline=True,
+                    zerolinewidth=1,
+                    zerolinecolor='black',
+                ),
+                margin=dict(
+                    l=50,   # left margin
+                    r=50,   # right margin
+                    b=150,  # bottom margin - increased to accommodate labels
+                    t=50,   # top margin
+                    pad=4   # padding between axis and labels
+                ),
+            )
+
+            return selected_metabolite, selected_bacteria, fig
+
+        except Exception as e:
+            logging.error("Error in callback: %s", e)
+            return None, None, create_empty_figure("Error", str(e))
+
+
 
     @app.callback(
         Output('tumor-plot', 'figure'),

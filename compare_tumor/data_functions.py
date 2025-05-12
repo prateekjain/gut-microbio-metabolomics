@@ -38,19 +38,52 @@ def selected_mz_cleaning(selected_mz):
     return selected_mz
 
 def get_gmm_name(table_name):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-
-    query_gmm_name = f"SELECT DISTINCT name FROM {table_name}"
-    cursor.execute(query_gmm_name)
-    mz_values = [row[0] for row in cursor.fetchall()]
-    # print('mz_values', mz_values)
-    cursor.close()
-    connection.close()
-    # print("mzval", mz_values[1])
-    mz_values = sorted(mz_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-    # print("mz_values", mz_values)
-    return mz_values
+    """
+    Fetches all distinct values from the 'name' column in the specified table.
+    
+    Args:
+        table_name (str): Name of the table in the database.
+        
+    Returns:
+        list: Sorted list of distinct name values.
+    """
+    try:
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        
+        # Check if table exists first
+        check_table_query = f"""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = %s
+        );
+        """
+        cursor.execute(check_table_query, (table_name,))
+        table_exists = cursor.fetchone()[0]
+        
+        if not table_exists:
+            logging.error(f"Table '{table_name}' does not exist in the database.")
+            return []
+            
+        # Get distinct name values
+        query_gmm_name = f"SELECT DISTINCT name FROM {table_name}"
+        cursor.execute(query_gmm_name)
+        mz_values = [row[0] for row in cursor.fetchall()]
+        
+        # Sort the values
+        mz_values = sorted(mz_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+        logging.info(f"Retrieved {len(mz_values)} distinct name values from {table_name}")
+        
+        return mz_values
+        
+    except Exception as e:
+        logging.error(f"Error retrieving name values from {table_name}: {e}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
 
 
 
@@ -447,23 +480,44 @@ def get_column_names(table_name):
     Returns:
         list: List of column names.
     """
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-    
-    columns_to_exclude = ['mz', 'rt', 'list_2_match', 'name']
-
-    # Establishing connection
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-    
-    # Dynamically generating the query excluding unwanted columns
-    query = f"SELECT * FROM {table_name} LIMIT 0"
-    cursor.execute(query)
-    columns = [desc[0] for desc in cursor.description if desc[0] not in columns_to_exclude]
-    
-    cursor.close()
-    connection.close()
-    return columns
+    try:
+        # Columns to exclude
+        columns_to_exclude = ['mz', 'rt', 'list_2_match', 'name']
+        
+        # Establishing connection
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        
+        # Check if table exists first
+        check_table_query = f"""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = %s
+        );
+        """
+        cursor.execute(check_table_query, (table_name,))
+        table_exists = cursor.fetchone()[0]
+        
+        if not table_exists:
+            logging.error(f"Table '{table_name}' does not exist in the database.")
+            return []
+        
+        # Dynamically generating the query excluding unwanted columns
+        query = f"SELECT * FROM {table_name} LIMIT 0"
+        cursor.execute(query)
+        columns = [desc[0] for desc in cursor.description if desc[0] not in columns_to_exclude]
+        
+        logging.info(f"Retrieved {len(columns)} column names from {table_name}")
+        return columns
+        
+    except Exception as e:
+        logging.error(f"Error retrieving column names from {table_name}: {e}")
+        return []
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'connection' in locals() and connection:
+            connection.close()
 
 
 def get_bacteria_names(table_name):
