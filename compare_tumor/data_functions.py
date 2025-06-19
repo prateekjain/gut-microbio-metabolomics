@@ -639,9 +639,22 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
 
         # Melt DataFrame to transform bacterial columns into rows
         df_melted = df.melt(id_vars=["name"], var_name="bacteria", value_name="value")
-        # print('df_melted \n', df_melted)
-        # Filter rows with non-null values
+        # Rename 'name' column to 'metabolite' for consistency with other functions
+        df_melted = df_melted.rename(columns={"name": "metabolite"})
+        
+        # Filter rows with non-null values and convert to numeric
         df_filtered = df_melted[df_melted["value"].notnull()]
+        
+        # Convert value column to numeric, handling any string values
+        df_filtered = df_filtered.copy()
+        df_filtered["value"] = pd.to_numeric(df_filtered["value"], errors='coerce')
+        
+        # Remove any rows where conversion failed
+        df_filtered = df_filtered[df_filtered["value"].notnull()]
+
+        if df_filtered.empty:
+            logging.warning(f"No valid numeric data found for compound: {selected_compound}")
+            return None
 
         # Sort by value and fetch top or bottom N
         ascending = True if order.lower() == "asc" else False
@@ -651,7 +664,6 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
         df_sorted = df_sorted.drop_duplicates(subset="bacteria", keep="first").head(top_n)
         
         logging.info(f"Fetched {len(df_sorted)} rows for {order.upper()} {top_n} values of compound: {selected_compound}.")
-        # print('df_sorted', df_sorted)
         return df_sorted
 
     except Exception as e:

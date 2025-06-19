@@ -698,15 +698,16 @@ main_layout = dbc.Container(
                 ),
             ]
         ),
-        dbc.Row(
-            [
+        html.Div(
+            className="section-spacing",
+            children=[
                 html.H2(
-                    "Different Heading",
+                    "In Vitro vs In Vivo",
                     className="section-heading",
                     id="section1",
                 ),
                 html.P(
-                    "Something to write here.",
+                    "Explore the metabolic differences between controlled laboratory conditions (in vitro) and living host environments (in vivo). Compare bacterial metabolite production across different experimental conditions.",
                     className="section-description",
                 ),
                 dcc.Tabs([
@@ -877,12 +878,23 @@ main_layout = dbc.Container(
                         ]
                     ),
                 ], id="section1-tabs", value="tab-a", className="tabs"),
+                
                 html.Div(className="border-line"),
-                dbc.Row(
-                    [
-                        dbc.Col(
+                
+                html.H3("Metabolite-Bacteria Heatmap", className="section-heading"),
+                html.P(
+                    "Select multiple bacteria and metabolites to visualize their relationships in an interactive heatmap.",
+                    className="section-description",
+                ),
+                
+                html.Div(
+                    className="form-section",
+                    children=[
+                        dbc.Row(
                             [
-                                html.Label("Select Bacteria:", className="select-label"),
+                                dbc.Col(
+                                    [
+                                        html.Label("Select Bacteria:", className="select-label"),
                                 dcc.Dropdown(
                                     id="selected-metabolites",
                                     options=[
@@ -937,14 +949,27 @@ main_layout = dbc.Container(
                         ),
                     ],
                 ),
+                    ]
+                ),
+                
                 html.Div(className="border-line"),
-                dbc.Row(
-                    [
-                        dbc.Col(
+                
+                html.H3("Top Metabolites Analysis", className="section-heading"),
+                html.P(
+                    "Select bacteria to analyze their top metabolite producers.",
+                    className="section-description",
+                ),
+                
+                html.Div(
+                    className="form-section",
+                    children=[
+                        dbc.Row(
                             [
-                                html.Label("Select Bacteria:", className="select-label"),
-                                dcc.Dropdown(
-                                    id="selected-bacteria-top",
+                                dbc.Col(
+                                    [
+                                        html.Label("Select Bacteria:", className="select-label"),
+                                        dcc.Dropdown(
+                                            id="selected-bacteria-top",
                                     options=[
                                         {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
                                     ],
@@ -979,14 +1004,27 @@ main_layout = dbc.Container(
                         ),
                     ],
                 ),
+                    ]
+                ),
+                
                 html.Div(className="border-line"),
-                dbc.Row(
-                    [
-                        dbc.Col(
+                
+                html.H3("Cumulative Top Metabolites", className="section-heading"),
+                html.P(
+                    "Analyze cumulative metabolite production patterns across selected bacteria.",
+                    className="section-description",
+                ),
+                
+                html.Div(
+                    className="form-section",
+                    children=[
+                        dbc.Row(
                             [
-                                html.Label("Select Bacteria:", className="select-label"),
-                                dcc.Dropdown(
-                                    id="selected-bacteria-cum-top",
+                                dbc.Col(
+                                    [
+                                        html.Label("Select Bacteria:", className="select-label"),
+                                        dcc.Dropdown(
+                                            id="selected-bacteria-cum-top",
                                     options=[
                                         {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
                                     ],
@@ -1020,6 +1058,8 @@ main_layout = dbc.Container(
                             className="outer-container",
                         ),
                     ],
+                ),
+                    ]
                 ),
             ]
         ),
