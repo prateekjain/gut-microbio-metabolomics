@@ -250,15 +250,23 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
         all_columns = [row[0] for row in cursor.fetchall()]
         logging.info("Columns fetched from table: %s", all_columns)
 
-        # Exclude non-bacteria columns
-        non_bacteria_columns = ["name", "mz", "rt", "list_2_match"]  # Adjust based on your schema
-        bacteria_columns = [col for col in all_columns if col not in non_bacteria_columns]
+        # Get only numeric bacterial columns, excluding metadata columns
+        cursor.execute(f"""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s 
+            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+        """, (table_name,))
+        bacteria_columns = [row[0] for row in cursor.fetchall()]
         logging.info("Bacteria columns determined dynamically: %s", bacteria_columns)
 
-        # Build the dynamic UNPIVOT query
-        unpivot_query = " UNION ALL ".join(
-            [f"SELECT name AS metabolite, '{col}' AS bacteria, {col} AS value FROM {table_name}" for col in bacteria_columns]
-        )
+        # Build the dynamic UNPIVOT query with properly quoted column names, casting to text
+        unpivot_parts = []
+        for col in bacteria_columns:
+            query_part = f"SELECT name AS metabolite, '{col}' AS bacteria, " + f'"{col}"' + f"::text AS value FROM {table_name}"
+            unpivot_parts.append(query_part)
+        unpivot_query = " UNION ALL ".join(unpivot_parts)
         query = f"""
         WITH UnpivotedData AS (
             {unpivot_query}
@@ -314,17 +322,26 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
         connection = psycopg2.connect(db_url)
         cursor = connection.cursor()
 
-        # Fetch column names dynamically
-        cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
-        all_columns = [row[0] for row in cursor.fetchall()]
-        non_bacteria_columns = ["name", "mz", "rt", "list_2_match"]
-        bacteria_columns = [col for col in all_columns if col not in non_bacteria_columns]
+        # Get only numeric bacterial columns, excluding metadata columns
+        cursor.execute(f"""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s 
+            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+        """, (table_name,))
+        bacteria_columns = [row[0] for row in cursor.fetchall()]
 
-        # Get top 10 data
+        # Get top 10 data with properly quoted column names, casting to text
+        unpivot_parts = []
+        for col in bacteria_columns:
+            query_part = f"SELECT DISTINCT name AS metabolite, '{col}' AS bacteria, " + f'"{col}"' + f"::text AS value FROM {table_name}"
+            unpivot_parts.append(query_part)
+        unpivot_union = " UNION ALL ".join(unpivot_parts)
+        
         base_query = f"""
         WITH UnpivotedData AS (
-            {" UNION ALL ".join([f"SELECT DISTINCT name AS metabolite, '{col}' AS bacteria, {col} AS value FROM {table_name}" 
-                                for col in bacteria_columns])}
+            {unpivot_union}
         ),
         RankedBacteria AS (
             SELECT DISTINCT ON (metabolite, bacteria)
@@ -412,20 +429,28 @@ def get_metabolite_data(table_name, metabolite):
         connection = psycopg2.connect(db_url)
         cursor = connection.cursor()
 
-        # Get bacterial columns
-        cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
-        all_columns = [row[0] for row in cursor.fetchall()]
-        bacterial_columns = [col for col in all_columns if col not in ['name', 'mz', 'rt', 'list_2_match']]
+        # Get bacterial columns (only numeric columns, excluding metadata columns)
+        cursor.execute(f"""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s 
+            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+        """, (table_name,))
+        bacterial_columns = [row[0] for row in cursor.fetchall()]
 
-        # Create UNPIVOT query
-        unpivot_query = " UNION ALL ".join(
-            [f"SELECT name as metabolite, '{col}' as bacteria, {col} as value FROM {table_name}" 
-             for col in bacterial_columns]
-        )
+        # Create UNPIVOT query with properly quoted column names, casting values to text to avoid type mismatches
+        unpivot_parts = []
+        for col in bacterial_columns:
+            query_part = f"SELECT name as metabolite, '{col}' as bacteria, " + f'"{col}"' + f"::text as value FROM {table_name}"
+            unpivot_parts.append(query_part)
+        unpivot_query = " UNION ALL ".join(unpivot_parts)
         
         query = f"""
         WITH unpivoted AS ({unpivot_query})
-        SELECT * FROM unpivoted WHERE metabolite = %s AND value IS NOT NULL
+        SELECT metabolite, bacteria, value::float AS value 
+        FROM unpivoted 
+        WHERE metabolite = %s AND value IS NOT NULL AND value != ''
         """
         
         cursor.execute(query, (metabolite,))
@@ -448,10 +473,12 @@ def get_bacteria_data(table_name, bacteria):
         connection = psycopg2.connect(db_url)
         cursor = connection.cursor()
         
+        # Quote the bacteria column name properly
+        quoted_bacteria = f'"{bacteria}"'
         query = f"""
-        SELECT name as metabolite, {bacteria} as value 
+        SELECT name, {quoted_bacteria} as value 
         FROM {table_name} 
-        WHERE {bacteria} IS NOT NULL
+        WHERE {quoted_bacteria} IS NOT NULL
         """
         
         cursor.execute(query)
@@ -582,15 +609,23 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
         cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
         columns = [desc[0] for desc in cursor.description]
 
-        # Filter bacterial columns (exclude non-bacterial columns like 'name', 'mz', 'rt')
-        bacterial_columns = [col for col in columns if col not in ['name', 'mz', 'rt', 'list_2_match']]
+        # Get only numeric bacterial columns, excluding metadata columns
+        cursor.execute(f"""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s 
+            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+        """, (table_name,))
+        bacterial_columns = [row[0] for row in cursor.fetchall()]
         # print("bacterial_columns", bacterial_columns)
         if not bacterial_columns:
             logging.error("No bacterial columns found in the table: %s", table_name)
             return None
 
-        # Query to fetch data for the selected compound
-        query = f"SELECT name, {', '.join(bacterial_columns)} FROM {table_name} WHERE name = %s"
+        # Query to fetch data for the selected compound with properly quoted column names
+        quoted_columns = [f'"{col}"' for col in bacterial_columns]
+        query = f"SELECT name, {', '.join(quoted_columns)} FROM {table_name} WHERE name = %s"
         cursor.execute(query, (selected_compound,))
         data = cursor.fetchall()
 
@@ -805,9 +840,11 @@ def get_case_columns_query(table_name, selected_mz):
     cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
     all_columns = [desc[0] for desc in cursor.description]
     # print(all_columns)
-    # Construct the SQL query dynamically
-    query_case = f"SELECT {', '.join([col for col in all_columns if '_case' in col.lower()])} FROM {table_name} WHERE mz = '{selected_mz}'"
-    query_control = f"SELECT {', '.join([col for col in all_columns if '_control' in col.lower()])} FROM {table_name} WHERE mz = '{selected_mz}'"
+    # Construct the SQL query dynamically with quoted column names
+    case_columns = [f'"{col}"' for col in all_columns if '_case' in col.lower()]
+    control_columns = [f'"{col}"' for col in all_columns if '_control' in col.lower()]
+    query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
+    query_control = f"SELECT {', '.join(control_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
     get_side_val = f"SELECT q_fdr, log_fc_matched FROM {table_name} WHERE mz = '{selected_mz}'"
     # print("query_case" ,query_case)
     # print("query_control", query_control)
@@ -839,7 +876,8 @@ def get_case_columns_vs_query(columName, selected_mz, table_name):
     cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
     all_columns = [desc[0] for desc in cursor.description]
     # print("all_columns", all_columns)
-    query_case = f"SELECT {', '.join([col for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()])} FROM {table_name} WHERE mz = '{selected_mz}'"
+    case_columns = [f'"{col}"' for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()]
+    query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
 
     cursor.execute(query_case)
     case_results = cursor.fetchall()
@@ -861,7 +899,8 @@ def get_case_columns_linear_query(columName, selected_mz, table_name):
     all_columns = [desc[0] for desc in cursor.description]
     # print("all_columns", all_columns)
 
-    query_case = f"SELECT {', '.join([col for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()])} FROM {table_name} WHERE mz = '{selected_mz}'"
+    case_columns = [f'"{col}"' for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()]
+    query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
     cursor.execute(query_case)
     case_results = cursor.fetchall()
 
@@ -884,7 +923,8 @@ def vs_columnNames(table_name, fig, selected_mz, region_call):
 
     cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
     all_columns = [desc[0] for desc in cursor.description]
-    query_q_vs = f"SELECT {', '.join([col for col in all_columns if 'vs' in col.lower()])} FROM {table_name} WHERE mz = '{selected_mz}'"
+    vs_columns = [f'"{col}"' for col in all_columns if 'vs' in col.lower()]
+    query_q_vs = f"SELECT {', '.join(vs_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
     cursor.execute(query_q_vs, (selected_mz,))
     query_q_vs_result = cursor.fetchall()
     # print("query_q_vs_result", query_q_vs_result)
@@ -1138,3 +1178,115 @@ def get_dropdown_options():
 #     # print("result", result_list)
 #     # result_list = sorted(result_list)
 #     return result_list
+
+
+def get_gmm_name_by_type(table_name, type_filter="all"):
+    """
+    Fetches metabolites filtered by type. Uses Metabolite column when available,
+    otherwise falls back to parsing name column suffix.
+    
+    Args:
+        table_name (str): Name of the table in the database.
+        type_filter (str): Filter by type - "by_name", "by_positive", "by_negative", or "all"
+        
+    Returns:
+        list: Sorted list of distinct metabolite values filtered by type.
+    """
+    try:
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        
+        # Check if table exists first
+        check_table_query = f"""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = %s
+        );
+        """
+        cursor.execute(check_table_query, (table_name,))
+        table_exists = cursor.fetchone()[0]
+        
+        if not table_exists:
+            logging.error(f"Table '{table_name}' does not exist")
+            return []
+        
+        # Check if Type and Metabolite columns exist and have data
+        check_columns_query = f"""
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = %s AND column_name IN ('Type', 'Metabolite')
+        ORDER BY column_name;
+        """
+        cursor.execute(check_columns_query, (table_name,))
+        existing_columns = [row[0] for row in cursor.fetchall()]
+        
+        has_type_metabolite = 'Type' in existing_columns and 'Metabolite' in existing_columns
+        
+        if has_type_metabolite:
+            # Check if these columns actually have data
+            cursor.execute(f'SELECT COUNT(*) FROM {table_name} WHERE "Type" IS NOT NULL AND "Metabolite" IS NOT NULL;')
+            data_count = cursor.fetchone()[0]
+            
+            if data_count > 0:
+                # Use Type and Metabolite columns
+                logging.info(f"Using Type and Metabolite columns for filtering in table '{table_name}'")
+                
+                if type_filter == "all":
+                    query_metabolites = f'SELECT DISTINCT "Metabolite" FROM {table_name} WHERE "Metabolite" IS NOT NULL'
+                    cursor.execute(query_metabolites)
+                else:
+                    query_metabolites = f'SELECT DISTINCT "Metabolite" FROM {table_name} WHERE "Type" = %s AND "Metabolite" IS NOT NULL'
+                    cursor.execute(query_metabolites, (type_filter,))
+                    
+                metabolite_values = [row[0] for row in cursor.fetchall()]
+                cursor.close()
+                connection.close()
+                
+                # Sort the values
+                metabolite_values = sorted(metabolite_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+                
+                logging.info(f"Retrieved {len(metabolite_values)} metabolites for type '{type_filter}' from table '{table_name}'")
+                return metabolite_values
+        
+        # Fall back to name column suffix parsing
+        logging.info(f"Falling back to name column suffix parsing for table '{table_name}'")
+        
+        # Build the query based on type filter using name column suffix
+        if type_filter == "all":
+            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" IS NOT NULL'
+        elif type_filter == "by_positive":
+            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" LIKE %s AND "name" IS NOT NULL'
+            filter_pattern = '%_POS%'
+        elif type_filter == "by_negative":
+            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" LIKE %s AND "name" IS NOT NULL'
+            filter_pattern = '%_NEG%'
+        elif type_filter == "by_name":
+            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" NOT LIKE %s AND "name" NOT LIKE %s AND "name" IS NOT NULL'
+            # For by_name, exclude both _POS and _NEG
+        else:
+            # Default to all if unknown filter
+            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" IS NOT NULL'
+        
+        # Execute query with appropriate parameters
+        if type_filter == "all":
+            cursor.execute(query_metabolites)
+        elif type_filter in ["by_positive", "by_negative"]:
+            cursor.execute(query_metabolites, (filter_pattern,))
+        elif type_filter == "by_name":
+            cursor.execute(query_metabolites, ('%_POS%', '%_NEG%'))
+        else:
+            cursor.execute(query_metabolites)
+            
+        metabolite_values = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        connection.close()
+        
+        # Sort the values
+        metabolite_values = sorted(metabolite_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+        
+        logging.info(f"Retrieved {len(metabolite_values)} metabolites for type '{type_filter}' from table '{table_name}'")
+        return metabolite_values
+        
+    except Exception as e:
+        logging.error(f"Error getting metabolites by type from table '{table_name}': {e}")
+        # Fallback to the original function
+        return get_gmm_name(table_name)

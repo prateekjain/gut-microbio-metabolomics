@@ -36,7 +36,29 @@ logging.basicConfig(
 
 
 def register_callbacks(app):
-    # Callbacks to show/hide details
+    
+    def get_table_name_from_tab(tab_id):
+        """
+        Helper function to get table name based on tab ID
+        Returns the appropriate table name for each tab
+        """
+        table_mapping = {
+            "tab-a": "gmm_test_1",  # In Vitro tab
+            "tab-b": "in_vivo",     # In Vivo tab
+        }
+        return table_mapping.get(tab_id, "gmm_test_1")  # Default fallback
+
+    def get_table_name_for_component(component_id):
+        """
+        Helper function to determine table name based on component ID suffix
+        """
+        if component_id.endswith("-a"):
+            return "gmm_test_1"  # In Vitro
+        elif component_id.endswith("-b"):
+            return "in_vivo"     # In Vivo
+        else:
+            return "gmm_test_1"  # Default fallback
+    
     # Callbacks to show/hide details
     @app.callback(
         [
@@ -128,7 +150,7 @@ def register_callbacks(app):
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
         
         logging.info(f"Triggered by (Tab B): {triggered_id}")
-        table_name = "rplc"  # Use the new table
+        table_name = get_table_name_from_tab("tab-b")
 
         try:
             # Initialize variables
@@ -251,7 +273,7 @@ def register_callbacks(app):
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
         
         logging.info(f"Triggered by (Tab A): {triggered_id}")
-        table_name = "gmm_test_1"  # Use the original table for Tab A
+        table_name = get_table_name_from_tab("tab-a")
 
         try:
             # Initialize variables
@@ -410,7 +432,7 @@ def register_callbacks(app):
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
         
         logging.info(f"Triggered by: {triggered_id}")
-        table_name = "gmm_test_1"
+        table_name = get_table_name_from_tab("tab-a")
 
         try:
         # Initialize variables
@@ -529,7 +551,7 @@ def register_callbacks(app):
     def update_scatter_top_plot(selected_bacteria):
         logging.info(f"Triggered callback with bacteria: {selected_bacteria}")
 
-        table_name = "gmm_test_1"
+        table_name = get_table_name_from_tab("tab-a")
 
         try:
             if not selected_bacteria:
@@ -652,7 +674,7 @@ def register_callbacks(app):
     )
     def update_scatter_top_plot(selected_bacteria):
         logging.info(f"Triggered callback with bacteria: {selected_bacteria}")
-        table_name = "gmm_test_1"
+        table_name = get_table_name_from_tab("tab-a")
 
         try:
             # Check for minimum 2 bacteria selection
@@ -799,7 +821,7 @@ def register_callbacks(app):
         # print(f"Selected Metabolites: {selected_metabolites}, Selected Bacteria: {selected_bacteria}")  # Debug log
         logging.info(f"Selected Metabolites: {selected_metabolites}, Selected Bacteria: {selected_bacteria}")
         
-        table_name = "gmm_test_1"
+        table_name = get_table_name_from_tab("tab-a")
 
         # Fetch all data
         try:
@@ -887,20 +909,35 @@ def register_callbacks(app):
             logging.error("Error creating heatmap: %s", e)
             return go.Figure()
 
+    # Callback to update metabolite dropdown options based on type filter for Tab A
+    @app.callback(
+        Output("selected-metabolite-gmm-a", "options"),
+        [Input("type-filter-radio-a", "value")]
+    )
+    def update_metabolite_options_a(type_filter):
+        try:
+            from .data_functions import get_gmm_name_by_type
+            table_name = get_table_name_for_component("selected-metabolite-gmm-a")
+            metabolites = get_gmm_name_by_type(table_name, type_filter)
+            return [{"label": name, "value": name} for name in metabolites]
+        except Exception as e:
+            logging.error(f"Error updating metabolite options for Tab A: {e}")
+            return []
 
-    
-
-
-
-
-
-
-
-
-
-
-
-
+    # Callback to update metabolite dropdown options based on type filter for Tab B
+    @app.callback(
+        Output("selected-metabolite-gmm-b", "options"),
+        [Input("type-filter-radio-b", "value")]
+    )
+    def update_metabolite_options_b(type_filter):
+        try:
+            from .data_functions import get_gmm_name_by_type
+            table_name = get_table_name_for_component("selected-metabolite-gmm-b")
+            metabolites = get_gmm_name_by_type(table_name, type_filter)
+            return [{"label": name, "value": name} for name in metabolites]
+        except Exception as e:
+            logging.error(f"Error updating metabolite options for Tab B: {e}")
+            return []
 
 
 

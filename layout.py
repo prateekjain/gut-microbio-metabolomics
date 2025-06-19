@@ -711,11 +711,24 @@ main_layout = dbc.Container(
                 ),
                 dcc.Tabs([
                     dcc.Tab(
-                        label="Tab A",
+                        label="In Vitro",
                         value="tab-a",
                         children=[
                             dbc.Row([
                                 dbc.Col([
+                                    html.Label("Filter by Type:", className="select-label"),
+                                    dbc.RadioItems(
+                                        id="type-filter-radio-a",
+                                        options=[
+                                            {"label": "By Name", "value": "by_name"},
+                                            {"label": "By Positive", "value": "by_positive"},
+                                            {"label": "By Negative", "value": "by_negative"},
+                                            {"label": "All Types", "value": "all"}
+                                        ],
+                                        value="all",
+                                        inline=True,
+                                        className="select-input",
+                                    ),
                                     html.Label("Select Metabolite:", className="select-label"),
                                     dcc.Dropdown(
                                         id="selected-metabolite-gmm-a",
@@ -781,17 +794,30 @@ main_layout = dbc.Container(
                         ]
                     ),
                     dcc.Tab(
-                        label="RPLC_Pos",
+                        label="In Vivo",
                         value="tab-b",
                         children=[
                             dbc.Row([
                                 dbc.Col([
+                                    html.Label("Filter by Type:", className="select-label"),
+                                    dbc.RadioItems(
+                                        id="type-filter-radio-b",
+                                        options=[
+                                            {"label": "By Name", "value": "by_name"},
+                                            {"label": "By Positive", "value": "by_positive"},
+                                            {"label": "By Negative", "value": "by_negative"},
+                                            {"label": "All Types", "value": "all"}
+                                        ],
+                                        value="all",
+                                        inline=True,
+                                        className="select-input",
+                                    ),
                                     html.Label("Select Metabolite:", className="select-label"),
                                     dcc.Dropdown(
                                         id="selected-metabolite-gmm-b",
                                         options=[
                                             {"label": name, "value": name}
-                                            for name in list(get_gmm_name("rplc"))
+                                            for name in list(get_gmm_name("in_vivo"))
                                         ],
                                         placeholder="Select Metabolite",
                                         searchable=True,
@@ -816,7 +842,7 @@ main_layout = dbc.Container(
                                         id="selected-bacteria-gmm-b",
                                         options=[
                                             {"label": name, "value": name}
-                                            for name in list(get_column_names("rplc"))
+                                            for name in list(get_column_names("in_vivo"))
                                         ],
                                         placeholder="Select Bacteria",
                                         searchable=True,
