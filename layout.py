@@ -998,13 +998,14 @@ main_layout = dbc.Container(
                                                     inline=True,
                                                     className="select-input",
                                                 ),
-                                                html.Label("Select Bacteria (Y-axis):", className="select-label"),
+
+                                                html.Label("Select Metabolites", className="select-label"),
                                                 dcc.Dropdown(
-                                                    id="selected-bacteria-heatmap-b",
+                                                    id="selected-metabolites-heatmap-b",
                                                     options=[
-                                                        {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
+                                                        {"label": name, "value": name} for name in list(get_gmm_name("in_vivo"))
                                                     ],
-                                                    placeholder="Select Bacteria for Y-axis",
+                                                    placeholder="Select Metabolites for X-axis",
                                                     multi=True,  # Allow multi-selection
                                                     searchable=True,
                                                     clearable=True,
@@ -1015,14 +1016,14 @@ main_layout = dbc.Container(
                                             md=6,
                                         ),
                                         dbc.Col(
-                                            [
-                                                html.Label("Select Metabolites (X-axis):", className="select-label"),
+                                            [   
+                                                 html.Label("Select Bacteria:", className="select-label"),
                                                 dcc.Dropdown(
-                                                    id="selected-metabolites-heatmap-b",
+                                                    id="selected-bacteria-heatmap-b",
                                                     options=[
-                                                        {"label": name, "value": name} for name in list(get_gmm_name("in_vivo"))
+                                                        {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
                                                     ],
-                                                    placeholder="Select Metabolites for X-axis",
+                                                    placeholder="Select Bacteria for Y-axis",
                                                     multi=True,  # Allow multi-selection
                                                     searchable=True,
                                                     clearable=True,

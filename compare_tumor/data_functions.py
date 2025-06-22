@@ -509,7 +509,7 @@ def get_column_names(table_name):
     """
     try:
         # Columns to exclude
-        columns_to_exclude = ['mz', 'rt', 'list_2_match', 'name']
+        columns_to_exclude = ['mz', 'rt', 'list_2_match', 'name', 'Type', 'metabolite']
         
         # Establishing connection
         connection = psycopg2.connect(db_url)
@@ -1194,8 +1194,9 @@ def get_dropdown_options():
 
 def get_gmm_name_by_type(table_name, type_filter="all"):
     """
-    Fetches metabolites filtered by type. Uses Metabolite column when available,
-    otherwise falls back to parsing name column suffix.
+    Fetches metabolites filtered by type. Handles different table structures:
+    - in_vivo: Uses Type column for filtering, returns name column values
+    - gmm_test_1: Uses name column suffix parsing for filtering
     
     Args:
         table_name (str): Name of the table in the database.
@@ -1222,78 +1223,54 @@ def get_gmm_name_by_type(table_name, type_filter="all"):
             logging.error(f"Table '{table_name}' does not exist")
             return []
         
-        # Check if Type and Metabolite columns exist and have data
+        # Check if Type column exists and has data
         check_columns_query = f"""
         SELECT column_name FROM information_schema.columns 
-        WHERE table_name = %s AND column_name IN ('Type', 'Metabolite')
-        ORDER BY column_name;
+        WHERE table_name = %s AND column_name = 'Type'
         """
         cursor.execute(check_columns_query, (table_name,))
-        existing_columns = [row[0] for row in cursor.fetchall()]
+        has_type_column = len(cursor.fetchall()) > 0
         
-        has_type_metabolite = 'Type' in existing_columns and 'Metabolite' in existing_columns
-        
-        if has_type_metabolite:
-            # Check if these columns actually have data
-            cursor.execute(f'SELECT COUNT(*) FROM {table_name} WHERE "Type" IS NOT NULL AND "Metabolite" IS NOT NULL;')
-            data_count = cursor.fetchone()[0]
+        if has_type_column and table_name == "in_vivo":
+            # Use Type column for in_vivo table
+            logging.info(f"Using Type column for filtering in table '{table_name}'")
             
-            if data_count > 0:
-                # Use Type and Metabolite columns
-                logging.info(f"Using Type and Metabolite columns for filtering in table '{table_name}'")
+            if type_filter == "all":
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites)
+            else:
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites, (type_filter,))
                 
-                if type_filter == "all":
-                    query_metabolites = f'SELECT DISTINCT "Metabolite" FROM {table_name} WHERE "Metabolite" IS NOT NULL'
-                    cursor.execute(query_metabolites)
-                else:
-                    query_metabolites = f'SELECT DISTINCT "Metabolite" FROM {table_name} WHERE "Type" = %s AND "Metabolite" IS NOT NULL'
-                    cursor.execute(query_metabolites, (type_filter,))
-                    
-                metabolite_values = [row[0] for row in cursor.fetchall()]
-                cursor.close()
-                connection.close()
-                
-                # Sort the values
-                metabolite_values = sorted(metabolite_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-                
-                logging.info(f"Retrieved {len(metabolite_values)} metabolites for type '{type_filter}' from table '{table_name}'")
-                return metabolite_values
-        
-        # Fall back to name column suffix parsing
-        logging.info(f"Falling back to name column suffix parsing for table '{table_name}'")
-        
-        # Build the query based on type filter using name column suffix
-        if type_filter == "all":
-            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" IS NOT NULL'
-        elif type_filter == "by_positive":
-            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" LIKE %s AND "name" IS NOT NULL'
-            filter_pattern = '%_POS%'
-        elif type_filter == "by_negative":
-            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" LIKE %s AND "name" IS NOT NULL'
-            filter_pattern = '%_NEG%'
-        elif type_filter == "by_name":
-            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" NOT LIKE %s AND "name" NOT LIKE %s AND "name" IS NOT NULL'
-            # For by_name, exclude both _POS and _NEG
-        else:
-            # Default to all if unknown filter
-            query_metabolites = f'SELECT DISTINCT "name" FROM {table_name} WHERE "name" IS NOT NULL'
-        
-        # Execute query with appropriate parameters
-        if type_filter == "all":
-            cursor.execute(query_metabolites)
-        elif type_filter in ["by_positive", "by_negative"]:
-            cursor.execute(query_metabolites, (filter_pattern,))
-        elif type_filter == "by_name":
-            cursor.execute(query_metabolites, ('%_POS%', '%_NEG%'))
-        else:
-            cursor.execute(query_metabolites)
+            metabolite_values = [row[0] for row in cursor.fetchall()]
             
-        metabolite_values = [row[0] for row in cursor.fetchall()]
+        else:
+            # Use name column suffix parsing for gmm_test_1 table
+            logging.info(f"Using name column suffix parsing for table '{table_name}'")
+            
+            if type_filter == "all":
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites)
+            elif type_filter == "by_positive":
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites, ('%_POS%',))
+            elif type_filter == "by_negative":
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites, ('%_NEG%',))
+            elif type_filter == "by_name":
+                # For gmm_test_1, "by_name" means metabolites without _POS or _NEG suffixes
+                # But since all records have _POS, this will return empty for gmm_test_1
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" NOT LIKE %s AND "name" NOT LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites, ('%_POS%', '%_NEG%'))
+            else:
+                # Default to all if unknown filter
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites)
+                
+            metabolite_values = [row[0] for row in cursor.fetchall()]
+        
         cursor.close()
         connection.close()
-        
-        # Sort the values
-        metabolite_values = sorted(metabolite_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
         
         logging.info(f"Retrieved {len(metabolite_values)} metabolites for type '{type_filter}' from table '{table_name}'")
         return metabolite_values
@@ -1302,3 +1279,86 @@ def get_gmm_name_by_type(table_name, type_filter="all"):
         logging.error(f"Error getting metabolites by type from table '{table_name}': {e}")
         # Fallback to the original function
         return get_gmm_name(table_name)
+
+
+def debug_table_structure(table_name):
+    """
+    Debug function to inspect table structure and sample data.
+    
+    Args:
+        table_name (str): Name of the table to inspect.
+        
+    Returns:
+        dict: Information about table structure and sample data.
+    """
+    try:
+        connection = psycopg2.connect(db_url)
+        cursor = connection.cursor()
+        
+        # Check if table exists
+        check_table_query = f"""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = %s
+        );
+        """
+        cursor.execute(check_table_query, (table_name,))
+        table_exists = cursor.fetchone()[0]
+        
+        if not table_exists:
+            return {"error": f"Table '{table_name}' does not exist"}
+        
+        # Get table info
+        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+        row_count = cursor.fetchone()[0]
+        
+        # Get column info
+        cursor.execute(f"""
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = %s 
+            ORDER BY ordinal_position
+        """, (table_name,))
+        columns_info = cursor.fetchall()
+        
+        # Get sample data
+        cursor.execute(f"SELECT * FROM {table_name} LIMIT 3")
+        sample_data = cursor.fetchall()
+        column_names = [desc[0] for desc in cursor.description]
+        
+        # Get distinct metabolite count
+        cursor.execute(f'SELECT COUNT(DISTINCT "name") FROM {table_name}')
+        unique_metabolites = cursor.fetchone()[0]
+        
+        # Get bacteria columns (numeric columns excluding metadata)
+        cursor.execute(f"""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = %s 
+            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'metabolite')
+        """, (table_name,))
+        bacteria_columns = [row[0] for row in cursor.fetchall()]
+        
+        return {
+            "table_name": table_name,
+            "exists": table_exists,
+            "total_rows": row_count,
+            "unique_metabolites": unique_metabolites,
+            "total_columns": len(columns_info),
+            "bacteria_columns_count": len(bacteria_columns),
+            "bacteria_columns": bacteria_columns[:10],  # First 10 bacteria columns
+            "column_info": columns_info,
+            "sample_data": {
+                "columns": column_names,
+                "rows": sample_data
+            }
+        }
+        
+    except Exception as e:
+        return {"error": f"Error inspecting table '{table_name}': {str(e)}"}
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'connection' in locals() and connection:
+            connection.close()

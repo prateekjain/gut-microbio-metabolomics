@@ -178,23 +178,22 @@ def register_callbacks(app):
             # Handle radio button trigger
             elif triggered_id == "top-bottom-radio-b":
                 logging.info(f"Radio button triggered with metabolite: {selected_metabolite}, filter: {top_bottom}")
-                if selected_metabolite:
-                    plot_type = "metabolite"
-                    if top_bottom == "top":
-                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
-                        logging.info(f"Top 10 data shape: {df.shape if df is not None else 'None'}")
-                    elif top_bottom == "bottom":
-                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
-                        logging.info(f"Bottom 10 data shape: {df.shape if df is not None else 'None'}")
-                    else:  # "all"
-                        df = get_metabolite_data(table_name, selected_metabolite)
-                        logging.info(f"All data shape: {df.shape if df is not None else 'None'}")
-                else:
-                    return None, None, create_empty_figure("No Metabolite Selected", 
-                                                        "Please select a metabolite first, then choose top/bottom filter")
+            if selected_metabolite:
+                plot_type = "metabolite"
+                if top_bottom == "top":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                    logging.info(f"Top 10 data shape: {df.shape if df is not None else 'None'}")
+                elif top_bottom == "bottom":
+                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                    logging.info(f"Bottom 10 data shape: {df.shape if df is not None else 'None'}")
+                else:  # "all"
+                    df = get_metabolite_data(table_name, selected_metabolite)
+                    logging.info(f"All data shape: {df.shape if df is not None else 'None'}")
             else:
                 return None, None, create_empty_figure("No Selection", 
                                                     "Please select either a metabolite or bacteria")
+            return None, None, create_empty_figure("No Metabolite Selected", 
+                                                        "Please select a metabolite first, then choose top/bottom filter")
 
             if df is None or df.empty:
                 return (selected_metabolite, selected_bacteria, 
@@ -398,8 +397,8 @@ def register_callbacks(app):
             logging.error("Error in callback: %s", e)
             return None, None, create_empty_figure("Error", str(e))
 
-
-
+        
+        
     @app.callback(
         Output('tumor-plot', 'figure'),
         Output('normal-plot', 'figure'),
@@ -907,23 +906,214 @@ def register_callbacks(app):
                 textfont={"size": 10},  # Adjust text font size
             ))
 
-            # Update layout
+            # Calculate dynamic dimensions based on data size
+            num_metabolites = len(heatmap_data.columns)
+            num_bacteria = len(heatmap_data.index)
+            
+            # Dynamic width calculation (minimum 800px, 60px per metabolite)
+            plot_width = max(800, num_metabolites * 60)
+            # Dynamic height calculation (minimum 600px, 40px per bacteria)
+            plot_height = max(600, num_bacteria * 40)
+            
+            print(f"[DEBUG] In Vitro Plot dimensions: {plot_width}x{plot_height} for {num_metabolites} metabolites x {num_bacteria} bacteria")
+
+            # Update layout with responsive sizing
             fig.update_layout(
-                title='Heatmap for Selected Metabolites and Bacteria',
+                title='In Vitro Heatmap: Selected Metabolites and Bacteria',
                 xaxis_title='Metabolites',
                 yaxis_title='Bacteria',
-                xaxis=dict(tickangle=90),
-                yaxis=dict(tickfont=dict(color='black')),
-                margin=dict(l=100, r=100, t=50, b=50),
+                width=plot_width,  # Dynamic width
+                height=plot_height,  # Dynamic height
+                xaxis=dict(
+                    tickangle=90,
+                    side='bottom',
+                    tickfont=dict(size=10),
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='black', size=10),
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                ),
+                margin=dict(l=150, r=50, t=80, b=100),  # Adjusted margins for better spacing
                 plot_bgcolor="white",
                 paper_bgcolor="white",
-                height=max(600, len(heatmap_data.index) * 20),  # Adjust height dynamically
+                font=dict(size=10),
+                showlegend=False,  # Heatmap doesn't need legend
             )
             return fig
 
         except Exception as e:
             logging.error("Error creating heatmap: %s", e)
             return go.Figure()
+
+    # Callback for In Vivo Heatmap (gmm-heatmap-plot-b)
+    @app.callback(
+        Output('gmm-heatmap-plot-b', 'figure'),
+        [
+            Input("selected-bacteria-heatmap-b", "value"),
+            Input("selected-metabolites-heatmap-b", "value"),
+        ]
+    )
+    def gmm_heatmap_multiple_b(selected_bacteria, selected_metabolites):
+        print(f"[DEBUG] In Vivo Heatmap - Selected Bacteria: {selected_bacteria}")
+        print(f"[DEBUG] In Vivo Heatmap - Selected Metabolites: {selected_metabolites}")
+        logging.info(f"In Vivo Heatmap - Selected Bacteria: {selected_bacteria}, Selected Metabolites: {selected_metabolites}")
+        
+        table_name = "in_vivo"  # Use in_vivo table for In Vivo tab
+        print(f"[DEBUG] Using table: {table_name}")
+
+        # Check if both selections are made
+        if not selected_bacteria or not selected_metabolites:
+            print("[DEBUG] Missing selections - returning empty figure")
+            return create_empty_figure("No Selection", "Please select both bacteria and metabolites to generate heatmap")
+
+        # Fetch all data
+        try:
+            print(f"[DEBUG] Fetching data from table: {table_name}")
+            df = get_all_columns_data_all_compounds(table_name)
+            print(f"[DEBUG] Data fetched - Shape: {df.shape if df is not None else 'None'}")
+            print(f"[DEBUG] Data columns: {list(df.columns) if df is not None else 'None'}")
+            
+            if df is None or df.empty:
+                logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
+                print(f"[DEBUG] DataFrame is empty for table: {table_name}")
+                return create_empty_figure("No Data", f"No data available from table: {table_name}")
+        except Exception as e:
+            logging.error("Error fetching data: %s", e)
+            print(f"[DEBUG] Error fetching data: {e}")
+            return create_empty_figure("Error", f"Error fetching data: {str(e)}")
+
+        # Filter data based on selected metabolites (X-axis) and bacteria (Y-axis)
+        try:
+            print(f"[DEBUG] Original data shape: {df.shape}")
+            
+            # Filter by selected metabolites (rows in the dataframe)
+            if selected_metabolites:
+                df_filtered = df[df["name"].isin(selected_metabolites)]
+                print(f"[DEBUG] After metabolite filtering: {df_filtered.shape}")
+                print(f"[DEBUG] Selected metabolites found: {list(df_filtered['name'].unique())}")
+            else:
+                df_filtered = df
+            
+            # Filter by selected bacteria (columns in the dataframe)
+            if selected_bacteria:
+                # Keep 'name' column plus selected bacteria columns
+                columns_to_keep = ["name"] + [col for col in selected_bacteria if col in df_filtered.columns]
+                df_filtered = df_filtered[columns_to_keep]
+                print(f"[DEBUG] After bacteria filtering: {df_filtered.shape}")
+                print(f"[DEBUG] Selected bacteria columns found: {[col for col in selected_bacteria if col in df.columns]}")
+                print(f"[DEBUG] Selected bacteria columns missing: {[col for col in selected_bacteria if col not in df.columns]}")
+            
+            print(f"[DEBUG] Final filtered data shape: {df_filtered.shape}")
+            print(f"[DEBUG] Final filtered data columns: {list(df_filtered.columns)}")
+            
+            if df_filtered.empty:
+                return create_empty_figure("No Data", "No data found for selected bacteria and metabolites")
+                
+            logging.info("Data filtered for In Vivo heatmap.")
+        except Exception as e:
+            logging.error("Error filtering data: %s", e)
+            print(f"[DEBUG] Error filtering data: {e}")
+            return create_empty_figure("Error", f"Error filtering data: {str(e)}")
+
+        try:
+            # Convert numeric columns to numeric and set "name" as index
+            print(f"[DEBUG] Converting to numeric and setting index...")
+            numeric_df = df_filtered.set_index("name").apply(pd.to_numeric, errors="coerce")
+            print(f"[DEBUG] Numeric conversion complete. Shape: {numeric_df.shape}")
+            print(f"[DEBUG] Numeric data sample:\n{numeric_df.head()}")
+            
+            # Check for NaN values in the DataFrame
+            if numeric_df.isnull().values.any():
+                logging.warning("DataFrame contains NaN values. These will be ignored during summation.")
+                print(f"[DEBUG] DataFrame contains NaN values")
+
+            # Compute the sum of all bacteria for each metabolite (row-wise sum)
+            sum_row = numeric_df.sum(axis=1, skipna=True)  
+            print(f"[DEBUG] Sum row calculated: {sum_row}")
+
+            # Add the sum row as "Net Balance"
+            numeric_df["Net Balance"] = sum_row
+            numeric_df = pd.concat([numeric_df[["Net Balance"]].T, numeric_df.drop(columns="Net Balance").T]).T
+            print(f"[DEBUG] Net Balance added. Final shape: {numeric_df.shape}")
+            logging.info("Added row for the sum of selected bacteria (In Vivo).")
+        except Exception as e:
+            logging.error("Error adding Net Balance row: %s", e)
+            print(f"[DEBUG] Error adding Net Balance row: {e}")
+            return create_empty_figure("Error", f"Error processing data: {str(e)}")
+
+        # Prepare heatmap data
+        try:
+            # Transpose the DataFrame so metabolites are columns (x-axis), bacteria are rows (y-axis)
+            heatmap_data = numeric_df.T  
+            print(f"[DEBUG] Heatmap data prepared. Shape: {heatmap_data.shape}")
+            print(f"[DEBUG] Heatmap X-axis (metabolites): {list(heatmap_data.columns)}")
+            print(f"[DEBUG] Heatmap Y-axis (bacteria): {list(heatmap_data.index)}")
+            
+        except Exception as e:
+            logging.error("Error preparing data for heatmap: %s", e)
+            print(f"[DEBUG] Error preparing heatmap data: {e}")
+            return create_empty_figure("Error", f"Error preparing heatmap: {str(e)}")
+
+        # Create heatmap
+        try:
+            print(f"[DEBUG] Creating heatmap...")
+            fig = go.Figure(data=go.Heatmap(
+                z=heatmap_data.values,  # Heatmap values
+                x=heatmap_data.columns,  # Metabolites (X-axis)
+                y=heatmap_data.index,    # Bacteria (Y-axis), including "Net Balance"
+                colorscale='RdYlGn',
+                colorbar=dict(title="Value"),
+                text=heatmap_data.values,  # Add the cell values
+                texttemplate="%{text:.2f}",  # Format text to show two decimal places
+                textfont={"size": 10},  # Adjust text font size
+            ))
+
+            # Calculate dynamic dimensions based on data size
+            num_metabolites = len(heatmap_data.columns)
+            num_bacteria = len(heatmap_data.index)
+            
+            # Dynamic width calculation (minimum 800px, 60px per metabolite)
+            plot_width = max(800, num_metabolites * 60)
+            # Dynamic height calculation (minimum 600px, 40px per bacteria)
+            plot_height = max(600, num_bacteria * 40)
+            
+            print(f"[DEBUG] Plot dimensions: {plot_width}x{plot_height} for {num_metabolites} metabolites x {num_bacteria} bacteria")
+
+            # Update layout with responsive sizing
+            fig.update_layout(
+                title='In Vivo Heatmap: Bacteria (Y-axis) vs Metabolites (X-axis)',
+                xaxis_title='Metabolites',
+                yaxis_title='Bacteria',
+                width=plot_width,  # Dynamic width
+                height=plot_height,  # Dynamic height
+                xaxis=dict(
+                    tickangle=90,
+                    side='bottom',
+                    tickfont=dict(size=10),
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                ),
+                yaxis=dict(
+                    tickfont=dict(color='black', size=10),
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.1)'
+                ),
+                margin=dict(l=150, r=50, t=80, b=100),  # Adjusted margins for better spacing
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                font=dict(size=10),
+                showlegend=False,  # Heatmap doesn't need legend
+            )
+            print(f"[DEBUG] Heatmap created successfully")
+            return fig
+
+        except Exception as e:
+            logging.error("Error creating heatmap: %s", e)
+            print(f"[DEBUG] Error creating heatmap: {e}")
+            return create_empty_figure("Error", f"Error creating heatmap: {str(e)}")
 
     # Callback to update metabolite dropdown options based on type filter for Tab A
     @app.callback(
@@ -954,6 +1144,234 @@ def register_callbacks(app):
         except Exception as e:
             logging.error(f"Error updating metabolite options for Tab B: {e}")
             return []
+
+    # Callback to update metabolite dropdown options based on type filter for In Vitro Heatmap
+    @app.callback(
+        Output("selected-bacteria", "options"),
+        [Input("type-filter-radio-heatmap", "value")]
+    )
+    def update_metabolite_options_heatmap_a(type_filter):
+        try:
+            from .data_functions import get_gmm_name_by_type
+            table_name = "gmm_test_1"
+            metabolites = get_gmm_name_by_type(table_name, type_filter)
+            print(f"[DEBUG] Heatmap A metabolite options updated. Type: {type_filter}, Count: {len(metabolites)}")
+            return [{"label": name, "value": name} for name in metabolites]
+        except Exception as e:
+            logging.error(f"Error updating metabolite options for In Vitro Heatmap: {e}")
+            print(f"[DEBUG] Error updating metabolite options for In Vitro Heatmap: {e}")
+            return []
+
+    # Callback to update metabolite dropdown options based on type filter for In Vivo Heatmap
+    @app.callback(
+        Output("selected-metabolites-heatmap-b", "options"),
+        [Input("type-filter-radio-heatmap-b", "value")]
+    )
+    def update_metabolite_options_heatmap_b(type_filter):
+        try:
+            from .data_functions import get_gmm_name_by_type
+            table_name = "in_vivo"
+            metabolites = get_gmm_name_by_type(table_name, type_filter)
+            print(f"[DEBUG] Heatmap B metabolite options updated. Type: {type_filter}, Count: {len(metabolites)}")
+            return [{"label": name, "value": name} for name in metabolites]
+        except Exception as e:
+            logging.error(f"Error updating metabolite options for In Vivo Heatmap: {e}")
+            print(f"[DEBUG] Error updating metabolite options for In Vivo Heatmap: {e}")
+            return []
+
+    # Callback for In Vivo Top Metabolites Analysis
+    @app.callback(
+        Output("gmm-scatter-top-plot-b", "figure"),
+        [Input("selected-bacteria-top-b", "value")],
+    )
+    def update_scatter_top_plot_b(selected_bacteria):
+        logging.info(f"Triggered In Vivo top metabolites callback with bacteria: {selected_bacteria}")
+        print(f"[DEBUG] In Vivo Top Metabolites - Selected bacteria: {selected_bacteria}")
+
+        table_name = "in_vivo"  # Use in_vivo table
+
+        try:
+            if not selected_bacteria:
+                logging.info("No bacteria selected for In Vivo top metabolites.")
+                return create_empty_figure("No Bacteria Selected", "Please select bacteria from the dropdown to view the plot.")
+            
+            # Fetch data for all bacteria in the top 10 metabolites
+            df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria)
+            print(f'[DEBUG] In Vivo top 10 df: {df.shape if df is not None else "None"}')
+
+            if df is None or df.empty:
+                logging.warning("No data found for selected bacteria in In Vivo top metabolites")
+                return create_empty_figure("No Data", f"No data found for selected bacteria: {', '.join(selected_bacteria)}")
+
+            # Create scatter plot
+            fig = go.Figure()
+
+            # Group data by bacteria and metabolite for plotting
+            for bacteria, group in df.groupby("bacteria"):
+                fig.add_trace(
+                    go.Scatter(
+                        x=group["metabolite"],
+                        y=group["value"],
+                        mode="markers",
+                        marker=dict(size=10),
+                        name=bacteria,
+                    )
+                )
+
+            # Update layout
+            fig.update_layout(
+                title="In Vivo: Top 10 Metabolites for Selected Bacteria",
+                xaxis_title="Metabolite",
+                yaxis_title="Value",
+                template="plotly_white",
+                xaxis=dict(tickangle=90, showgrid=True),
+                yaxis=dict(showgrid=True),
+                legend_title="Bacteria",
+                showlegend=True,
+                legend=dict(
+                    y=1.15,
+                    x=1,
+                    bgcolor='rgba(255, 255, 255, 0.8)',
+                    bordercolor='rgba(0,0,0,0.1)',
+                    borderwidth=1
+                ),
+                margin=dict(
+                    t=100,
+                    b=50,
+                    l=50,
+                    r=50
+                )
+            )
+
+            return fig
+
+        except Exception as e:
+            logging.error("Error in In Vivo top metabolites callback: %s", e)
+            print(f"[DEBUG] Error in In Vivo top metabolites callback: {e}")
+            return create_empty_figure("Error", str(e))
+
+    # Callback for In Vivo Cumulative Top Metabolites Analysis
+    @app.callback(
+        Output("gmm-scatter-cumm-top-plot-b", "figure"),
+        [Input("selected-bacteria-cum-top-b", "value")],
+    )
+    def update_scatter_cumm_top_plot_b(selected_bacteria):
+        logging.info(f"Triggered In Vivo cumulative top metabolites callback with bacteria: {selected_bacteria}")
+        print(f"[DEBUG] In Vivo Cumulative Top Metabolites - Selected bacteria: {selected_bacteria}")
+        
+        table_name = "in_vivo"  # Use in_vivo table
+
+        try:
+            # Check for minimum 2 bacteria selection
+            if not selected_bacteria or len(selected_bacteria) < 2:
+                return create_empty_figure(
+                    "Insufficient Selection", 
+                    "Please select at least 2 bacteria to compare their collective presence in top producers."
+                )
+
+            df = get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria)
+
+            if df is None or df.empty:
+                return create_empty_figure(
+                    "No Matching Data", 
+                    f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite in In Vivo data."
+                )
+
+            # Create scatter plot with improvements
+            fig = go.Figure()
+
+            # Sort metabolites by average value to improve readability
+            metabolite_order = (df.groupby('metabolite')['value']
+                            .mean()
+                            .sort_values(ascending=False)
+                            .index.unique())
+
+            bacteria_list = sorted(df['bacteria'].unique())
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
+                    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+            color_map = dict(zip(bacteria_list, colors[:len(bacteria_list)]))
+
+            for bacteria in bacteria_list:
+                group = df[df['bacteria'] == bacteria]
+                
+                # Handle duplicates without reindexing
+                group = group.sort_values('metabolite').drop_duplicates(['metabolite', 'bacteria'])
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=group["metabolite"],
+                        y=group["value"],
+                        mode="markers",
+                        marker=dict(
+                            size=12,
+                            symbol='circle',
+                            color=color_map[bacteria],
+                            line=dict(width=1, color='white')
+                        ),
+                        name=bacteria.replace('_', ' ').title(),
+                        hovertemplate=(
+                            "<b>Bacteria:</b> %{fullData.name}<br>" +
+                            "<b>Metabolite:</b> %{x}<br>" +
+                            "<b>Value:</b> %{y:.2f}<br>" +
+                            "<extra></extra>"
+                        )
+                    )
+                )
+
+            scatter_width = max(1000, len(metabolite_order) * 50)
+            
+            fig.update_layout(
+                title={
+                    'text': "In Vivo: Metabolites where Selected Bacteria are Collectively in Top 10 Producers",
+                    'y':0.95,
+                    'x':0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top'
+                },
+                xaxis_title="Metabolite",
+                yaxis_title="Value",
+                template="plotly_white",
+                width=scatter_width,
+                height=600,
+                showlegend=True,
+                legend=dict(
+                    yanchor="top",
+                    y=1,
+                    xanchor="right",
+                    x=1.15,
+                    bgcolor='rgba(255, 255, 255, 0.8)'
+                ),
+                xaxis=dict(
+                    tickangle=45,
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='lightgray',
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black',
+                    tickfont=dict(size=10),
+                    range=[-0.5, len(metabolite_order) - 0.5]
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='lightgray',
+                    showline=True,
+                    linewidth=1,
+                    linecolor='black',
+                    zeroline=True,
+                    zerolinewidth=1,
+                    zerolinecolor='black'
+                ),
+                plot_bgcolor='white'
+            )
+
+            return fig
+
+        except Exception as e:
+            logging.error("Error in In Vivo cumulative top metabolites callback: %s", e)
+            print(f"[DEBUG] Error in In Vivo cumulative top metabolites callback: {e}")
+            return create_empty_figure("Error", str(e))
 
 
 
