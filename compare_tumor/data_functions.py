@@ -1,6 +1,7 @@
 # data_functions.py
 import os
 import psycopg2
+from psycopg2 import pool
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
 from dotenv import load_dotenv
@@ -9,8 +10,10 @@ from compare_tumor.constant import *
 import logging
 import psycopg2
 import pandas as pd
+from contextlib import contextmanager
+import functools
+import time
 
-# Configure logging
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,  # Adjust to DEBUG for more verbose logs
@@ -21,7 +24,6 @@ logging.basicConfig(
     ]
 )
 
-
 all_columns = []
 
 region = ["cecum", "ascending", "transverse",
@@ -30,6 +32,123 @@ region = ["cecum", "ascending", "transverse",
 load_dotenv()
 db_url = os.getenv('DATABASE_URL')
 
+# ===== CONNECTION POOL SETUP =====
+class DatabasePool:
+    _instance = None
+    _pool = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DatabasePool, cls).__new__(cls)
+        return cls._instance
+    
+    def initialize_pool(self, minconn=2, maxconn=10):
+        """Initialize the connection pool"""
+        try:
+            if self._pool is None:
+                self._pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn, maxconn, db_url
+                )
+                logging.info(f"Database connection pool initialized with {minconn}-{maxconn} connections")
+        except Exception as e:
+            logging.error(f"Error initializing connection pool: {e}")
+            raise
+    
+    def get_connection(self):
+        """Get a connection from the pool"""
+        try:
+            if self._pool is None:
+                self.initialize_pool()
+            return self._pool.getconn()
+        except Exception as e:
+            logging.error(f"Error getting connection from pool: {e}")
+            raise
+    
+    def put_connection(self, connection):
+        """Return a connection to the pool"""
+        try:
+            if self._pool and connection:
+                self._pool.putconn(connection)
+        except Exception as e:
+            logging.error(f"Error returning connection to pool: {e}")
+    
+    def close_all(self):
+        """Close all connections in the pool"""
+        try:
+            if self._pool:
+                self._pool.closeall()
+                self._pool = None
+                logging.info("All database connections closed")
+        except Exception as e:
+            logging.error(f"Error closing connection pool: {e}")
+
+# Initialize the pool singleton
+db_pool = DatabasePool()
+
+@contextmanager
+def get_db_connection():
+    """Context manager for database connections"""
+    connection = None
+    cursor = None
+    try:
+        connection = db_pool.get_connection()
+        cursor = connection.cursor()
+        yield cursor
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        logging.error(f"Database error: {e}")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            db_pool.put_connection(connection)
+
+# ===== CACHING DECORATORS =====
+def simple_cache(max_size=128, ttl=300):  # 5 minute TTL
+    """Simple in-memory cache decorator"""
+    def decorator(func):
+        cache = {}
+        cache_times = {}
+        
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create cache key from function name and arguments
+            key = f"{func.__name__}:{str(args)}:{str(sorted(kwargs.items()))}"
+            current_time = time.time()
+            
+            # Check if cached result is valid
+            if key in cache and key in cache_times:
+                if current_time - cache_times[key] < ttl:
+                    logging.debug(f"Cache hit for {func.__name__}")
+                    return cache[key]
+                else:
+                    # Remove expired entry
+                    del cache[key]
+                    del cache_times[key]
+            
+            # Execute function and cache result
+            result = func(*args, **kwargs)
+            
+            # Manage cache size
+            if len(cache) >= max_size:
+                # Remove oldest entry
+                oldest_key = min(cache_times.keys(), key=lambda k: cache_times[k])
+                del cache[oldest_key]
+                del cache_times[oldest_key]
+            
+            cache[key] = result
+            cache_times[key] = current_time
+            logging.debug(f"Cache miss for {func.__name__} - result stored")
+            return result
+        
+        # Add cache management methods
+        wrapper.clear_cache = lambda: cache.clear() or cache_times.clear()
+        wrapper.cache_info = lambda: {"size": len(cache), "max_size": max_size, "ttl": ttl}
+        
+        return wrapper
+    return decorator
 
 def selected_mz_cleaning(selected_mz):
     if "'" in selected_mz:
@@ -37,6 +156,7 @@ def selected_mz_cleaning(selected_mz):
         # print("updated mz value", selected_mz)
     return selected_mz
 
+@simple_cache(max_size=50, ttl=600)  # Cache for 10 minutes
 def get_gmm_name(table_name):
     """
     Fetches all distinct values from the 'name' column in the specified table.
@@ -48,42 +168,35 @@ def get_gmm_name(table_name):
         list: Sorted list of distinct name values.
     """
     try:
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        
-        # Check if table exists first
-        check_table_query = f"""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = %s
-        );
-        """
-        cursor.execute(check_table_query, (table_name,))
-        table_exists = cursor.fetchone()[0]
-        
-        if not table_exists:
-            logging.error(f"Table '{table_name}' does not exist in the database.")
-            return []
+        with get_db_connection() as cursor:
+            # Check if table exists first
+            check_table_query = f"""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = %s
+            );
+            """
+            cursor.execute(check_table_query, (table_name,))
+            table_exists = cursor.fetchone()[0]
             
-        # Get distinct name values
-        query_gmm_name = f"SELECT DISTINCT name FROM {table_name}"
-        cursor.execute(query_gmm_name)
-        mz_values = [row[0] for row in cursor.fetchall()]
-        
-        # Sort the values
-        mz_values = sorted(mz_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-        logging.info(f"Retrieved {len(mz_values)} distinct name values from {table_name}")
-        
-        return mz_values
-        
+            if not table_exists:
+                logging.error(f"Table '{table_name}' does not exist in the database.")
+                return []
+                
+            # Get distinct name values
+            query_gmm_name = f"SELECT DISTINCT name FROM {table_name} ORDER BY name"
+            cursor.execute(query_gmm_name)
+            mz_values = [row[0] for row in cursor.fetchall()]
+            
+            # Sort the values
+            mz_values = sorted(mz_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+            logging.info(f"Retrieved {len(mz_values)} distinct name values from {table_name}")
+            
+            return mz_values
+            
     except Exception as e:
         logging.error(f"Error retrieving name values from {table_name}: {e}")
         return []
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
 
 
 
@@ -166,9 +279,11 @@ def get_all_columns_data(table_name, selected_compound):
             connection.close()
 
 
+@simple_cache(max_size=10, ttl=900)  # Cache for 15 minutes - larger tables need longer cache
 def get_all_columns_data_all_compounds(table_name):
     """
     Fetches all rows and columns from the given table.
+    This is an expensive operation and results are cached.
 
     Args:
         table_name (str): Name of the table in the database.
@@ -180,49 +295,32 @@ def get_all_columns_data_all_compounds(table_name):
     print(f"Fetching data from table: {table_name}")  # Debug log
 
     try:
-        # Connect to the database
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        logging.info("Database connection established")
-    except Exception as e:
-        logging.error("Error connecting to the database: %s", e)
-        print(f"Error connecting to database: {e}")  # Debug log
-        return None
+        with get_db_connection() as cursor:
+            # Fetch all data
+            query = f"SELECT * FROM {table_name}"
+            cursor.execute(query)
+            data = cursor.fetchall()
 
-    try:
-        # Fetch all data
-        query = f"SELECT * FROM {table_name}"
-        cursor.execute(query)
-        data = cursor.fetchall()
+            # Get column names
+            columns = [desc[0] for desc in cursor.description]
+            logging.info("Columns fetched: %s", columns)
 
-        # Get column names
-        columns = [desc[0] for desc in cursor.description]
-        logging.info("Columns fetched: %s", columns)
-        # print(f"Columns: {columns}")  # Debug log
+            # Create DataFrame
+            df = pd.DataFrame(data, columns=columns)
+            columns_to_exclude = ['mz', 'rt', 'list_2_match']
+            df = df.drop(columns=columns_to_exclude, errors='ignore')
+            logging.info("DataFrame created successfully for the table: %s", table_name)
 
-        # Create DataFrame
-        df = pd.DataFrame(data, columns=columns)
-        columns_to_exclude = [ 'mz', 'rt', 'list_2_match']
-        df = df.drop(columns=columns_to_exclude, errors='ignore')
-        logging.info("DataFrame created successfully for the table: %s", table_name)
+            # Drop duplicates if any
+            df = df.drop_duplicates()
+            print(f"DataFrame shape after processing: {df.shape}")  # More efficient debug log
 
-        # Drop duplicates if any
-        df = df.drop_duplicates()
-        print(f"DataFrame after removing duplicates:\n{df}")  # Debug log
-
-        return df
+            return df
 
     except Exception as e:
         logging.error("Error fetching data: %s", e)
         print(f"Error fetching data: {e}")  # Debug log
         return None
-
-    finally:
-        # Ensure cursor and connection are closed
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
 
 
 
@@ -423,80 +521,69 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
             connection.close()
 
 
+@simple_cache(max_size=100, ttl=300)  # Cache metabolite data for 5 minutes
 def get_metabolite_data(table_name, metabolite):
     """Fetch all bacteria values for a specific metabolite"""
     try:
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
+        with get_db_connection() as cursor:
+            # Get bacterial columns (only numeric columns, excluding metadata columns)
+            cursor.execute(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+                AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+            """, (table_name,))
+            bacterial_columns = [row[0] for row in cursor.fetchall()]
 
-        # Get bacterial columns (only numeric columns, excluding metadata columns)
-        cursor.execute(f"""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = %s 
-            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
-            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
-        """, (table_name,))
-        bacterial_columns = [row[0] for row in cursor.fetchall()]
-
-        # Create UNPIVOT query with properly quoted column names, casting values to text to avoid type mismatches
-        unpivot_parts = []
-        for col in bacterial_columns:
-            query_part = f"SELECT name as metabolite, '{col}' as bacteria, " + f'"{col}"' + f"::text as value FROM {table_name}"
-            unpivot_parts.append(query_part)
-        unpivot_query = " UNION ALL ".join(unpivot_parts)
-        
-        query = f"""
-        WITH unpivoted AS ({unpivot_query})
-        SELECT metabolite, bacteria, value::float AS value 
-        FROM unpivoted 
-        WHERE metabolite = %s AND value IS NOT NULL AND value != ''
-        """
-        
-        cursor.execute(query, (metabolite,))
-        data = cursor.fetchall()
-        
-        return pd.DataFrame(data, columns=['metabolite', 'bacteria', 'value'])
+            # Create UNPIVOT query with properly quoted column names, casting values to text to avoid type mismatches
+            unpivot_parts = []
+            for col in bacterial_columns:
+                query_part = f"SELECT name as metabolite, '{col}' as bacteria, " + f'"{col}"' + f"::text as value FROM {table_name}"
+                unpivot_parts.append(query_part)
+            unpivot_query = " UNION ALL ".join(unpivot_parts)
+            
+            query = f"""
+            WITH unpivoted AS ({unpivot_query})
+            SELECT metabolite, bacteria, value::float AS value 
+            FROM unpivoted 
+            WHERE metabolite = %s AND value IS NOT NULL AND value != ''
+            """
+            
+            cursor.execute(query, (metabolite,))
+            data = cursor.fetchall()
+            
+            return pd.DataFrame(data, columns=['metabolite', 'bacteria', 'value'])
 
     except Exception as e:
         logging.error("Error fetching metabolite data: %s", e)
         return None
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
 
+@simple_cache(max_size=100, ttl=300)  # Cache bacteria data for 5 minutes
 def get_bacteria_data(table_name, bacteria):
     """Fetch all metabolite values for a specific bacteria"""
     try:
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        
-        # Quote the bacteria column name properly
-        quoted_bacteria = f'"{bacteria}"'
-        query = f"""
-        SELECT name, {quoted_bacteria} as value 
-        FROM {table_name} 
-        WHERE {quoted_bacteria} IS NOT NULL
-        """
-        
-        cursor.execute(query)
-        data = cursor.fetchall()
-        
-        df = pd.DataFrame(data, columns=['metabolite', 'value'])
-        df['bacteria'] = bacteria
-        return df
+        with get_db_connection() as cursor:
+            # Quote the bacteria column name properly
+            quoted_bacteria = f'"{bacteria}"'
+            query = f"""
+            SELECT name, {quoted_bacteria} as value 
+            FROM {table_name} 
+            WHERE {quoted_bacteria} IS NOT NULL
+            """
+            
+            cursor.execute(query)
+            data = cursor.fetchall()
+            
+            df = pd.DataFrame(data, columns=['metabolite', 'value'])
+            df['bacteria'] = bacteria
+            return df
 
     except Exception as e:
         logging.error("Error fetching bacteria data: %s", e)
-        return None
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()                       
+        return None                       
             
+@simple_cache(max_size=20, ttl=600)  # Cache column names for 10 minutes
 def get_column_names(table_name):
     """
     Fetches all column names except the 'name' column from the table.
@@ -511,40 +598,32 @@ def get_column_names(table_name):
         # Columns to exclude
         columns_to_exclude = ['mz', 'rt', 'list_2_match', 'name', 'Type', 'metabolite']
         
-        # Establishing connection
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        
-        # Check if table exists first
-        check_table_query = f"""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = %s
-        );
-        """
-        cursor.execute(check_table_query, (table_name,))
-        table_exists = cursor.fetchone()[0]
-        
-        if not table_exists:
-            logging.error(f"Table '{table_name}' does not exist in the database.")
-            return []
-        
-        # Dynamically generating the query excluding unwanted columns
-        query = f"SELECT * FROM {table_name} LIMIT 0"
-        cursor.execute(query)
-        columns = [desc[0] for desc in cursor.description if desc[0] not in columns_to_exclude]
-        
-        logging.info(f"Retrieved {len(columns)} column names from {table_name}")
-        return columns
+        with get_db_connection() as cursor:
+            # Check if table exists first
+            check_table_query = f"""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = %s
+            );
+            """
+            cursor.execute(check_table_query, (table_name,))
+            table_exists = cursor.fetchone()[0]
+            
+            if not table_exists:
+                logging.error(f"Table '{table_name}' does not exist in the database.")
+                return []
+            
+            # Dynamically generating the query excluding unwanted columns
+            query = f"SELECT * FROM {table_name} LIMIT 0"
+            cursor.execute(query)
+            columns = [desc[0] for desc in cursor.description if desc[0] not in columns_to_exclude]
+            
+            logging.info(f"Retrieved {len(columns)} column names from {table_name}")
+            return columns
         
     except Exception as e:
         logging.error(f"Error retrieving column names from {table_name}: {e}")
         return []
-    finally:
-        if 'cursor' in locals() and cursor:
-            cursor.close()
-        if 'connection' in locals() and connection:
-            connection.close()
 
 
 def get_bacteria_names(table_name):

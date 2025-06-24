@@ -1,7 +1,8 @@
 # callback.py
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
 import forestplot as fp
@@ -18,6 +19,8 @@ import json
 import plotly.tools as tls
 from compare_tumor.data_functions import *
 import logging
+import time
+import functools
 
 from compare_tumor.dynamicPlots import tumor_vs_normal_plot, all_regions_plots, comparable_plots, addAnotations
 matplotlib.use("Agg")  
@@ -34,6 +37,32 @@ logging.basicConfig(
     ]
 )
 
+# ===== PERFORMANCE OPTIMIZATION DECORATORS =====
+def performance_logger(func):
+    """Decorator to log function execution time"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        try:
+            result = func(*args, **kwargs)
+            execution_time = time.time() - start_time
+            logging.info(f"Callback {func.__name__} executed in {execution_time:.2f} seconds")
+            return result
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logging.error(f"Callback {func.__name__} failed after {execution_time:.2f} seconds: {e}")
+            raise
+    return wrapper
+
+def prevent_empty_updates(func):
+    """Decorator to prevent updates when inputs are None or empty"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # Check if any required arguments are None or empty
+        if args and (args[0] is None or (isinstance(args[0], (list, str)) and len(args[0]) == 0)):
+            raise PreventUpdate
+        return func(*args, **kwargs)
+    return wrapper
 
 def register_callbacks(app):
     
@@ -274,8 +303,10 @@ def register_callbacks(app):
         Output("gmm-scatter-plot-a", "figure")],
         [Input("selected-metabolite-gmm-a", "value"),
         Input("selected-bacteria-gmm-a", "value"),
-        Input("top-bottom-radio-a", "value")] 
+        Input("top-bottom-radio-a", "value")],
+        prevent_initial_call=True  # Prevent initial callback execution
     )
+    @performance_logger
     def update_scatter_plot_a(selected_metabolite, selected_bacteria, top_bottom):
         ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
