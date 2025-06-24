@@ -7,6 +7,34 @@ from compare_tumor.callback import register_callbacks
 from compare_tumor.data_functions import *
     
     
+# ===== CENTRALIZED LOADING FUNCTION =====
+def create_loading_wrapper(component_id, children, loading_type="circle", className=""):
+    """
+    Centralized loading wrapper function for consistent UX across the application.
+    
+    Args:
+        component_id (str): Unique ID for the loading component
+        children (list): Content to wrap with loading
+        loading_type (str): Type of loading animation ('circle', 'dot', 'cube', 'graph', 'default')
+        className (str): Additional CSS classes for the loading wrapper
+    
+    Returns:
+        dcc.Loading: Loading component with consistent styling
+    """
+    return dcc.Loading(
+        id=f"loading-{component_id}",
+        type=loading_type,
+        children=children,
+        color="#667eea",
+        className=f"loading-wrapper {className}",
+        loading_state={'is_loading': False},
+        style={
+            "minHeight": "200px",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center"
+        }
+    )
 
 region = [
     "cecum",
@@ -60,10 +88,9 @@ tabs_mz = dcc.Tabs(
                     [
                         dbc.Col(
                             [
-                                dcc.Loading(
-                                    id="outer-container-loading",
-                                    type="circle",
-                                    children=[
+                                create_loading_wrapper(
+                                    "mz-negative-plots",
+                                    [
                                         html.Div(
                                             [
                                                 dbc.Row(
@@ -103,6 +130,7 @@ tabs_mz = dcc.Tabs(
                                             className="outer-container with-shadow",
                                         ),
                                     ],
+                                    "circle"
                                 ),
                             ],
                             md=12,
@@ -148,10 +176,9 @@ tabs_mz = dcc.Tabs(
                     [
                         dbc.Col(
                             [
-                                dcc.Loading(
-                                    id="outer-container-plus-loading",
-                                    type="circle",
-                                    children=[
+                                create_loading_wrapper(
+                                    "mz-positive-plots",
+                                    [
                                         html.Div(
                                             [
                                                 dbc.Row(
@@ -191,6 +218,7 @@ tabs_mz = dcc.Tabs(
                                             className="outer-container with-shadow",
                                         ),
                                     ],
+                                    "circle"
                                 ),
                             ],
                             md=12,
@@ -731,18 +759,25 @@ main_layout = dbc.Container(
                                         className="select-input radio-horizontal",
                                     ),
                                     html.Label("Select Metabolite:", className="select-label"),
-                                    dcc.Dropdown(
-                                        id="selected-metabolite-gmm-a",
-                                        options=[
-                                            {"label": name, "value": name}
-                                            for name in list(get_gmm_name("gmm_test_1"))
+                                    create_loading_wrapper(
+                                        "metabolite-dropdown-a",
+                                        [
+                                            dcc.Dropdown(
+                                                id="selected-metabolite-gmm-a",
+                                                options=[
+                                                    {"label": name, "value": name}
+                                                    for name in list(get_gmm_name("gmm_test_1"))
+                                                ],
+                                                placeholder="Select Metabolite",
+                                                searchable=True,
+                                                clearable=True,
+                                                multi=False,
+                                                style={"width": "100%"},
+                                                className="select-input",
+                                            ),
                                         ],
-                                        placeholder="Select Metabolite",
-                                        searchable=True,
-                                        clearable=True,
-                                        multi=False,
-                                        style={"width": "100%"},
-                                        className="select-input",
+                                        "dot",
+                                        "dropdown-loading"
                                     ),
                                     dbc.RadioItems(
                                         id="top-bottom-radio-a",
@@ -769,10 +804,9 @@ main_layout = dbc.Container(
                                         style={"width": "100%"},
                                         className="select-input",
                                     ),
-                                    dcc.Loading(
-                                        id="outer-container-plus-loading-a",
-                                        type="circle",
-                                        children=[
+                                    create_loading_wrapper(
+                                        "gmm-scatter-a",
+                                        [
                                             html.Div([
                                                 html.Div(
                                                     id="selected-gmm-value-a",
@@ -789,6 +823,7 @@ main_layout = dbc.Container(
                                             className="outer-container",
                                             ),
                                         ],
+                                        "circle"
                                     ),
                                 ], md=12),
                             ]),
@@ -814,18 +849,25 @@ main_layout = dbc.Container(
                                         className="select-input radio-horizontal",
                                     ),
                                     html.Label("Select Metabolite:", className="select-label"),
-                                    dcc.Dropdown(
-                                        id="selected-metabolite-gmm-b",
-                                        options=[
-                                            {"label": name, "value": name}
-                                            for name in list(get_gmm_name("in_vivo"))
+                                    create_loading_wrapper(
+                                        "metabolite-dropdown-b",
+                                        [
+                                            dcc.Dropdown(
+                                                id="selected-metabolite-gmm-b",
+                                                options=[
+                                                    {"label": name, "value": name}
+                                                    for name in list(get_gmm_name("in_vivo"))
+                                                ],
+                                                placeholder="Select Metabolite",
+                                                searchable=True,
+                                                clearable=True,
+                                                multi=False,
+                                                style={"width": "100%"},
+                                                className="select-input",
+                                            ),
                                         ],
-                                        placeholder="Select Metabolite",
-                                        searchable=True,
-                                        clearable=True,
-                                        multi=False,
-                                        style={"width": "100%"},
-                                        className="select-input",
+                                        "dot",
+                                        "dropdown-loading"
                                     ),
                                     dbc.RadioItems(
                                         id="top-bottom-radio-b",
@@ -852,10 +894,9 @@ main_layout = dbc.Container(
                                         style={"width": "100%"},
                                         className="select-input",
                                     ),
-                                    dcc.Loading(
-                                        id="outer-container-plus-loading-b",
-                                        type="circle",
-                                        children=[
+                                    create_loading_wrapper(
+                                        "gmm-scatter-b",
+                                        [
                                             html.Div([
                                                 html.Div(
                                                     id="selected-gmm-value-b",
@@ -872,6 +913,7 @@ main_layout = dbc.Container(
                                             className="outer-container",
                                             ),
                                         ],
+                                        "circle"
                                     ),
                                 ], md=12),
                             ]),
@@ -916,17 +958,24 @@ main_layout = dbc.Container(
                                             className="select-input radio-horizontal",
                                         ),
                                         html.Label("Select Bacteria:", className="select-label"),
-                                        dcc.Dropdown(
-                                            id="selected-metabolites",
-                                            options=[
-                                                {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                        create_loading_wrapper(
+                                            "bacteria-dropdown-heatmap-a",
+                                            [
+                                                dcc.Dropdown(
+                                                    id="selected-metabolites",
+                                                    options=[
+                                                        {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                                    ],
+                                                    placeholder="Select Bacteria",
+                                                    multi=True,  # Allow multi-selection
+                                                    searchable=True,
+                                                    clearable=True,
+                                                    style={"width": "100%"},
+                                                    className="select-input",
+                                                ),
                                             ],
-                                            placeholder="Select Bacteria",
-                                            multi=True,  # Allow multi-selection
-                                            searchable=True,
-                                            clearable=True,
-                                            style={"width": "100%"},
-                                            className="select-input",
+                                            "dot",
+                                            "dropdown-loading"
                                         ),
                                     ],
                                     md=6,
@@ -951,10 +1000,9 @@ main_layout = dbc.Container(
                                 ),
                             ]
                         ),
-                dcc.Loading(
-                    id="outer-container-plus-loading-heatmap",
-                    type="circle",
-                    children=[
+                create_loading_wrapper(
+                    "gmm-heatmap",
+                    [
                         html.Div(
                             [
                                 html.Div(
@@ -969,6 +1017,8 @@ main_layout = dbc.Container(
                             className="outer-container",
                         ),
                     ],
+                    "circle",
+                    "heatmap-loading"
                 ),
                             ]
                         )
@@ -1000,17 +1050,24 @@ main_layout = dbc.Container(
                                                 ),
 
                                                 html.Label("Select Metabolites", className="select-label"),
-                                                dcc.Dropdown(
-                                                    id="selected-metabolites-heatmap-b",
-                                                    options=[
-                                                        {"label": name, "value": name} for name in list(get_gmm_name("in_vivo"))
+                                                create_loading_wrapper(
+                                                    "metabolites-dropdown-heatmap-b",
+                                                    [
+                                                        dcc.Dropdown(
+                                                            id="selected-metabolites-heatmap-b",
+                                                            options=[
+                                                                {"label": name, "value": name} for name in list(get_gmm_name("in_vivo"))
+                                                            ],
+                                                            placeholder="Select Metabolites for X-axis",
+                                                            multi=True,  # Allow multi-selection
+                                                            searchable=True,
+                                                            clearable=True,
+                                                            style={"width": "100%"},
+                                                            className="select-input",
+                                                        ),
                                                     ],
-                                                    placeholder="Select Metabolites for X-axis",
-                                                    multi=True,  # Allow multi-selection
-                                                    searchable=True,
-                                                    clearable=True,
-                                                    style={"width": "100%"},
-                                                    className="select-input",
+                                                    "dot",
+                                                    "dropdown-loading"
                                                 ),
                                             ],
                                             md=6,
@@ -1035,10 +1092,9 @@ main_layout = dbc.Container(
                                         ),
                                     ]
                                 ),
-                                dcc.Loading(
-                                    id="outer-container-plus-loading-heatmap-b",
-                                    type="circle",
-                                    children=[
+                                create_loading_wrapper(
+                                    "gmm-heatmap-b",
+                                    [
                                         html.Div(
                                             [
                                                 html.Div(
@@ -1053,6 +1109,8 @@ main_layout = dbc.Container(
                                             className="outer-container",
                                         ),
                                     ],
+                                    "circle",
+                                    "heatmap-loading"
                                 ),
                             ]
                         )
