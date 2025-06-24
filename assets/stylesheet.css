@@ -341,6 +341,47 @@ body {
     margin-right: 1.5rem;
 }
 
+/* ===== HORIZONTAL RADIO BUTTONS ===== */
+.radio-horizontal {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 1rem !important;
+    align-items: center !important;
+    margin: 0.5rem 0 1rem 0 !important;
+}
+
+.radio-horizontal .form-check {
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-width: auto !important;
+}
+
+.radio-horizontal .form-check-input {
+    margin: 0 0.5rem 0 0 !important;
+    position: static !important;
+}
+
+.radio-horizontal .form-check-label {
+    margin: 0 !important;
+    padding: 0.25rem 0.75rem !important;
+    background: rgba(102, 126, 234, 0.1) !important;
+    border-radius: 20px !important;
+    transition: all 0.3s ease !important;
+    white-space: nowrap !important;
+}
+
+.radio-horizontal .form-check-input:checked + .form-check-label {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+}
+
+.radio-horizontal .form-check-label:hover {
+    background: rgba(102, 126, 234, 0.2) !important;
+}
+
 /* ===== PLOT CONTAINERS ===== */
 .outer-container {
     background: white;

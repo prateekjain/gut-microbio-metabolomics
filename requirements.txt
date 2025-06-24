@@ -17,12 +17,11 @@ MarkupSafe==2.1.5
 forestplot==0.4.0
 myforestplot==0.2.3
 nest-asyncio==1.6.0
-numpy==1.26.3
-packaging==23.2
-pandas==2.2.0
+numpy>=1.26.3
+packaging>=23.2
+pandas>=2.2.0
 plotly==5.18.0
-psycopg2==2.9.7
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 python-dateutil==2.8.2
 python-dotenv==1.0.0
 pytz==2024.1
@@ -42,4 +41,4 @@ matplotlib
 matplotlib-inline
 imageio==2.31.1
 image==1.5.33
-Pillow==10.0.0
+Pillow>=10.2.0

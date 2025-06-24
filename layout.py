@@ -728,7 +728,7 @@ main_layout = dbc.Container(
                                         ],
                                         value="all",
                                         inline=True,
-                                        className="select-input",
+                                        className="select-input radio-horizontal",
                                     ),
                                     html.Label("Select Metabolite:", className="select-label"),
                                     dcc.Dropdown(
@@ -753,7 +753,7 @@ main_layout = dbc.Container(
                                         ],
                                         value="all",
                                         inline=True,
-                                        className="select-input",
+                                        className="select-input radio-horizontal",
                                     ),
                                     html.Label("Select Bacteria:", className="select-label"),
                                     dcc.Dropdown(
@@ -811,7 +811,7 @@ main_layout = dbc.Container(
                                         ],
                                         value="all",
                                         inline=True,
-                                        className="select-input",
+                                        className="select-input radio-horizontal",
                                     ),
                                     html.Label("Select Metabolite:", className="select-label"),
                                     dcc.Dropdown(
@@ -836,7 +836,7 @@ main_layout = dbc.Container(
                                         ],
                                         value="all",
                                         inline=True,
-                                        className="select-input",
+                                        className="select-input radio-horizontal",
                                     ),
                                     html.Label("Select Bacteria:", className="select-label"),
                                     dcc.Dropdown(
@@ -913,7 +913,7 @@ main_layout = dbc.Container(
                                             ],
                                             value="all",
                                             inline=True,
-                                            className="select-input",
+                                            className="select-input radio-horizontal",
                                         ),
                                         html.Label("Select Bacteria:", className="select-label"),
                                         dcc.Dropdown(
@@ -996,7 +996,7 @@ main_layout = dbc.Container(
                                                     ],
                                                     value="all",
                                                     inline=True,
-                                                    className="select-input",
+                                                    className="select-input radio-horizontal",
                                                 ),
 
                                                 html.Label("Select Metabolites", className="select-label"),
