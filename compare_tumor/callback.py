@@ -22,7 +22,7 @@ import logging
 import time
 import functools
 
-from compare_tumor.dynamicPlots import tumor_vs_normal_plot, all_regions_plots, comparable_plots, addAnotations
+from compare_tumor.dynamicPlots import tumor_vs_normal_plot, all_regions_plots, comparable_plots, addAnotations, create_dynamic_scatter_plot
 matplotlib.use("Agg")  
 region = ["cecum", "ascending", "transverse",
           "descending", "sigmoid", "rectosigmoid", "rectum"]
@@ -855,6 +855,153 @@ def register_callbacks(app):
             template="plotly_white",
         )
         return fig
+    
+    def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bottom=None):
+        """
+        Enhanced scatter plot creation with dynamic sizing and better performance
+        
+        Args:
+            data: DataFrame with columns ['metabolite', 'bacteria', 'value']
+            plot_type: 'metabolite' or 'bacteria' 
+            title: Plot title
+            top_bottom: Filter for top/bottom values
+            
+        Returns:
+            Plotly figure
+        """
+        if data is None or data.empty:
+            return create_empty_figure("No Data", "No data available for selection")
+        
+        # Data processing optimizations
+        data_clean = data.dropna()
+        
+        if plot_type == "metabolite":
+            x_axis = data_clean["bacteria"].str.replace("_", " ").str.upper()
+            y_axis = data_clean["value"]
+            x_title = "Bacteria"
+            title = title or f"Values for Metabolite"
+        else:  # bacteria
+            x_axis = data_clean["metabolite"].str.replace("_", " ").str.upper() 
+            y_axis = data_clean["value"]
+            x_title = "Metabolite"
+            title = title or f"Values for Bacteria"
+
+        # Dynamic sizing based on data
+        num_points = len(x_axis.unique())
+        scatter_width = max(800, min(1400, num_points * 25))
+        scatter_height = max(500, min(800, 400 + num_points * 5))
+        
+        # Create optimized scatter plot
+        fig = go.Figure()
+        
+        # Enhanced markers with better visual encoding
+        marker_size = max(6, min(15, 100 // num_points))
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'] * (num_points // 5 + 1)
+        
+        fig.add_trace(
+            go.Scatter(
+                x=x_axis,
+                y=y_axis,
+                mode="markers",
+                marker=dict(
+                    size=marker_size, 
+                    color=colors[:len(x_axis)],
+                    opacity=0.8,
+                    line=dict(width=1, color='white')
+                ),
+                hovertemplate=(
+                    f"<b>{x_title}</b>: %{{x}}<br>" +
+                    "<b>Value</b>: %{y:.2f}<br>" +
+                    "<extra></extra>"
+                )
+            )
+        )
+
+        # Enhanced layout with better responsiveness
+        fig.update_layout(
+            title={
+                'text': f"<b>{title}</b>",
+                'x': 0.5,
+                'xanchor': 'center',
+                'font': {'size': 16}
+            },
+            xaxis=dict(
+                title=x_title,
+                tickangle=45,
+                tickfont=dict(size=max(10, min(14, 80 // num_points))),
+                automargin=True,
+                ticks='outside',
+                ticklen=5,
+                showgrid=True,
+                gridcolor='rgba(128, 128, 128, 0.2)',
+                range=[-0.5, num_points - 0.5]
+            ),
+            yaxis=dict(
+                title="Values",
+                tickfont=dict(color='black'),
+                showline=True,
+                linecolor='black',
+                linewidth=1,
+                automargin=True,
+                ticks='outside',
+                ticklen=5,
+                zeroline=True,
+                zerolinewidth=1,
+                zerolinecolor='black',
+                showgrid=True,
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            ),
+            template="plotly_white",
+            width=scatter_width,
+            height=scatter_height,
+            margin=dict(l=80, r=60, b=120, t=80, pad=4),
+            plot_bgcolor='white',
+            paper_bgcolor='white'
+        )
+
+        return fig
+    
+    def process_heatmap_data_optimized(df, selected_metabolites=None, selected_bacteria=None):
+        """
+        Optimized data processing for heatmap generation
+        
+        Args:
+            df: Source DataFrame
+            selected_metabolites: List of metabolites to include
+            selected_bacteria: List of bacteria to include
+            
+        Returns:
+            Processed DataFrame ready for heatmap
+        """
+        if df is None or df.empty:
+            return None
+            
+        # Efficient filtering
+        df_filtered = df.copy()
+        
+        if selected_metabolites:
+            df_filtered = df_filtered[df_filtered["name"].isin(selected_metabolites)]
+        
+        if selected_bacteria:
+            # Keep 'name' column plus selected bacteria columns
+            columns_to_keep = ["name"] + [col for col in selected_bacteria if col in df_filtered.columns]
+            df_filtered = df_filtered[columns_to_keep]
+        
+        if df_filtered.empty:
+            return None
+            
+        # Optimized numeric conversion
+        numeric_df = df_filtered.set_index("name")
+        numeric_df = numeric_df.apply(pd.to_numeric, errors="coerce")
+        
+        # Efficient aggregation 
+        sum_row = numeric_df.sum(axis=1, skipna=True)
+        numeric_df["Net Balance"] = sum_row
+        
+        # Transpose for heatmap (metabolites as columns, bacteria as rows)
+        heatmap_data = numeric_df.T
+        
+        return heatmap_data
     
     
     @app.callback(

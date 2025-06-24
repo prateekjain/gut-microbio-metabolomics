@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 import plotly.graph_objs as go
 from dotenv import load_dotenv
 import pandas as pd
+import numpy as np
 from compare_tumor.constant import *
 import logging
 import psycopg2
@@ -13,6 +14,7 @@ import pandas as pd
 from contextlib import contextmanager
 import functools
 import time
+from typing import List, Dict, Optional, Tuple, Union
 
 # Configure logging
 logging.basicConfig(
@@ -661,10 +663,11 @@ def get_bacteria_names(table_name):
     return names
 
 
+@simple_cache(max_size=100, ttl=300)  # Cache for 5 minutes
 def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, order="desc"):
     """
-    Fetches the top or bottom N bacteria values for a specific compound from the database.
-
+    Enhanced function to fetch top/bottom N bacteria values with better data processing
+    
     Args:
         table_name (str): Name of the table in the database.
         selected_compound (str): Name of the compound to filter by.
@@ -672,89 +675,144 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
         order (str): Fetch order - 'desc' for top values, 'asc' for bottom values.
 
     Returns:
-        pd.DataFrame: DataFrame containing the top or bottom N bacteria values for the compound.
+        pd.DataFrame: Clean DataFrame with top/bottom N bacteria values
     """
     try:
-        # Connect to the database
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        logging.info("Database connection established")
-    except Exception as e:
-        logging.error("Error connecting to the database: %s", e)
-        return None
+        with get_db_connection() as cursor:
+            # Get only numeric bacterial columns using cached function
+            cursor.execute(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+                AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+            """, (table_name,))
+            bacterial_columns = [row[0] for row in cursor.fetchall()]
+            
+            if not bacterial_columns:
+                logging.error("No bacterial columns found in the table: %s", table_name)
+                return None
 
-    try:
-        # Fetch column names
-        cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-        columns = [desc[0] for desc in cursor.description]
+            # Optimized query using column selection and WHERE clause
+            quoted_columns = [f'"{col}"' for col in bacterial_columns]
+            query = f"SELECT name, {', '.join(quoted_columns)} FROM {table_name} WHERE name = %s"
+            cursor.execute(query, (selected_compound,))
+            data = cursor.fetchall()
 
-        # Get only numeric bacterial columns, excluding metadata columns
-        cursor.execute(f"""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = %s 
-            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
-            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
-        """, (table_name,))
-        bacterial_columns = [row[0] for row in cursor.fetchall()]
-        # print("bacterial_columns", bacterial_columns)
-        if not bacterial_columns:
-            logging.error("No bacterial columns found in the table: %s", table_name)
-            return None
+            if not data:
+                logging.warning("No data found for compound: %s", selected_compound)
+                return None
 
-        # Query to fetch data for the selected compound with properly quoted column names
-        quoted_columns = [f'"{col}"' for col in bacterial_columns]
-        query = f"SELECT name, {', '.join(quoted_columns)} FROM {table_name} WHERE name = %s"
-        cursor.execute(query, (selected_compound,))
-        data = cursor.fetchall()
+            # Create DataFrame with proper data types
+            df = pd.DataFrame(data, columns=["name"] + bacterial_columns)
+            
+            # Optimized melting with type conversion
+            df_melted = df.melt(
+                id_vars=["name"], 
+                var_name="bacteria", 
+                value_name="value"
+            ).rename(columns={"name": "metabolite"})
+            
+            # Vectorized data cleaning and conversion
+            df_clean = clean_dataframe_values(df_melted, 'value')
+            
+            if df_clean.empty:
+                logging.warning(f"No valid numeric data found for compound: {selected_compound}")
+                return None
 
-        # Check if data is available
-        if not data:
-            logging.warning("No data found for compound: %s", selected_compound)
-            return None
-
-        # Create DataFrame from fetched data
-        df = pd.DataFrame(data, columns=["name"] + bacterial_columns)
-
-        # Melt DataFrame to transform bacterial columns into rows
-        df_melted = df.melt(id_vars=["name"], var_name="bacteria", value_name="value")
-        # Rename 'name' column to 'metabolite' for consistency with other functions
-        df_melted = df_melted.rename(columns={"name": "metabolite"})
-        
-        # Filter rows with non-null values and convert to numeric
-        df_filtered = df_melted[df_melted["value"].notnull()]
-        
-        # Convert value column to numeric, handling any string values
-        df_filtered = df_filtered.copy()
-        df_filtered["value"] = pd.to_numeric(df_filtered["value"], errors='coerce')
-        
-        # Remove any rows where conversion failed
-        df_filtered = df_filtered[df_filtered["value"].notnull()]
-
-        if df_filtered.empty:
-            logging.warning(f"No valid numeric data found for compound: {selected_compound}")
-            return None
-
-        # Sort by value and fetch top or bottom N
-        ascending = True if order.lower() == "asc" else False
-        df_sorted = df_filtered.sort_values(by="value", ascending=ascending)
-
-        # Drop duplicates based on 'bacteria' while keeping the highest/lowest value
-        df_sorted = df_sorted.drop_duplicates(subset="bacteria", keep="first").head(top_n)
-        
-        logging.info(f"Fetched {len(df_sorted)} rows for {order.upper()} {top_n} values of compound: {selected_compound}.")
-        return df_sorted
+            # Efficient sorting and selection
+            ascending = order.lower() == "asc"
+            df_result = (df_clean
+                        .sort_values(by="value", ascending=ascending)
+                        .drop_duplicates(subset="bacteria", keep="first")
+                        .head(top_n)
+                        .reset_index(drop=True))
+            
+            logging.info(f"Processed {len(df_result)} {order.upper()} {top_n} values for {selected_compound}")
+            return df_result
 
     except Exception as e:
         logging.error("Error fetching top/bottom values: %s", e)
         return None
 
-    finally:
-        # Ensure cursor and connection are closed
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
+# ===== ENHANCED DATA PROCESSING UTILITIES =====
+def clean_dataframe_values(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+    """
+    Vectorized data cleaning for better performance
+    
+    Args:
+        df: DataFrame to clean
+        value_col: Column name containing values to clean
+        
+    Returns:
+        Cleaned DataFrame with valid numeric values
+    """
+    # Remove null values
+    df_clean = df[df[value_col].notnull()].copy()
+    
+    # Convert to numeric, coercing errors to NaN
+    df_clean[value_col] = pd.to_numeric(df_clean[value_col], errors='coerce')
+    
+    # Remove NaN, inf, and -inf values
+    df_clean = df_clean[
+        df_clean[value_col].notnull() & 
+        np.isfinite(df_clean[value_col])
+    ]
+    
+    # Remove zero values if needed (optional)
+    df_clean = df_clean[df_clean[value_col] > 0]
+    
+    return df_clean
+
+def optimize_dataframe_dtypes(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Optimize DataFrame data types for better memory usage and performance
+    
+    Args:
+        df: DataFrame to optimize
+        
+    Returns:
+        DataFrame with optimized data types
+    """
+    df_optimized = df.copy()
+    
+    # Optimize numeric columns
+    for col in df_optimized.select_dtypes(include=['float64']):
+        df_optimized[col] = pd.to_numeric(df_optimized[col], downcast='float')
+    
+    for col in df_optimized.select_dtypes(include=['int64']):
+        df_optimized[col] = pd.to_numeric(df_optimized[col], downcast='integer')
+    
+    # Optimize string columns to category if they have repeated values
+    for col in df_optimized.select_dtypes(include=['object']):
+        if df_optimized[col].nunique() / len(df_optimized) < 0.5:  # Less than 50% unique
+            df_optimized[col] = df_optimized[col].astype('category')
+    
+    return df_optimized
+
+def batch_process_data(data_list: List[pd.DataFrame]) -> pd.DataFrame:
+    """
+    Efficiently batch process multiple DataFrames
+    
+    Args:
+        data_list: List of DataFrames to process
+        
+    Returns:
+        Combined and processed DataFrame
+    """
+    if not data_list:
+        return pd.DataFrame()
+    
+    # Use concat for better performance than iterative append
+    combined_df = pd.concat(data_list, ignore_index=True)
+    
+    # Remove duplicates efficiently
+    combined_df = combined_df.drop_duplicates()
+    
+    # Optimize data types
+    combined_df = optimize_dataframe_dtypes(combined_df)
+    
+    return combined_df
 
 
 
