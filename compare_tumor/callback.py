@@ -178,22 +178,23 @@ def register_callbacks(app):
             # Handle radio button trigger
             elif triggered_id == "top-bottom-radio-b":
                 logging.info(f"Radio button triggered with metabolite: {selected_metabolite}, filter: {top_bottom}")
-            if selected_metabolite:
-                plot_type = "metabolite"
-                if top_bottom == "top":
-                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
-                    logging.info(f"Top 10 data shape: {df.shape if df is not None else 'None'}")
-                elif top_bottom == "bottom":
-                    df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
-                    logging.info(f"Bottom 10 data shape: {df.shape if df is not None else 'None'}")
-                else:  # "all"
-                    df = get_metabolite_data(table_name, selected_metabolite)
-                    logging.info(f"All data shape: {df.shape if df is not None else 'None'}")
+                if selected_metabolite:
+                    plot_type = "metabolite"
+                    if top_bottom == "top":
+                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
+                        logging.info(f"Top 10 data shape: {df.shape if df is not None else 'None'}")
+                    elif top_bottom == "bottom":
+                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
+                        logging.info(f"Bottom 10 data shape: {df.shape if df is not None else 'None'}")
+                    else:  # "all"
+                        df = get_metabolite_data(table_name, selected_metabolite)
+                        logging.info(f"All data shape: {df.shape if df is not None else 'None'}")
+                else:
+                    return None, None, create_empty_figure("No Metabolite Selected", 
+                                                        "Please select a metabolite first, then choose top/bottom filter")
             else:
                 return None, None, create_empty_figure("No Selection", 
                                                     "Please select either a metabolite or bacteria")
-            return None, None, create_empty_figure("No Metabolite Selected", 
-                                                        "Please select a metabolite first, then choose top/bottom filter")
 
             if df is None or df.empty:
                 return (selected_metabolite, selected_bacteria, 
@@ -450,7 +451,7 @@ def register_callbacks(app):
         table_name = get_table_name_from_tab("tab-a")
 
         try:
-        # Initialize variables
+            # Initialize variables
             df = None
             plot_type = None
 

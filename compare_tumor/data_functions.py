@@ -1238,9 +1238,18 @@ def get_gmm_name_by_type(table_name, type_filter="all"):
             if type_filter == "all":
                 query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
                 cursor.execute(query_metabolites)
-            else:
+            elif type_filter == "by_positive":
                 query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites, (type_filter,))
+                cursor.execute(query_metabolites, ('by_positive',))
+            elif type_filter == "by_negative":
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites, ('by_negative',))
+            elif type_filter == "by_name":
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites, ('by_name',))
+            else:
+                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                cursor.execute(query_metabolites)
                 
             metabolite_values = [row[0] for row in cursor.fetchall()]
             
