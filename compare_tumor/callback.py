@@ -260,13 +260,16 @@ def register_callbacks(app):
                 yaxis_title="Values",
                 template="plotly_white",
                 width=scatter_width,
+                height=400,  # Fixed height for horizontal scrolling
+                autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
                     tickangle=90,
-                    tickfont=dict(size=max(12, 100 // len(x_axis.unique()))),
+                    tickfont=dict(size=max(8, min(14, 120 // len(x_axis.unique())))),
                     automargin=True,
                     ticks='outside',
                     ticklen=5,
-                    range= [-0.1, len(x_axis.unique())]
+                    range=[-0.1, len(x_axis.unique())],
+                    fixedrange=False  # Allow zooming
                 ),
                 yaxis=dict(
                     tickfont=dict(color='black'),
@@ -280,12 +283,13 @@ def register_callbacks(app):
                     zeroline=True,
                     zerolinewidth=1,
                     zerolinecolor='black',
+                    fixedrange=False  # Allow zooming
                 ),
                 margin=dict(
-                    l=50,   # left margin
-                    r=50,   # right margin
-                    b=150,  # bottom margin - increased to accommodate labels
-                    t=50,   # top margin
+                    l=60,   # left margin
+                    r=40,   # right margin
+                    b=max(100, min(200, len(x_axis.unique()) * 2)),  # Dynamic bottom margin
+                    t=60,   # top margin
                     pad=4   # padding between axis and labels
                 ),
             )
@@ -393,13 +397,16 @@ def register_callbacks(app):
                 yaxis_title="Values",
                 template="plotly_white",
                 width=scatter_width,
+                height=400,  # Fixed height for horizontal scrolling
+                autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
                     tickangle=90,
-                    tickfont=dict(size=max(12, 100 // len(x_axis.unique()))),
+                    tickfont=dict(size=max(8, min(14, 120 // len(x_axis.unique())))),
                     automargin=True,
                     ticks='outside',
                     ticklen=5,
-                    range= [-0.1, len(x_axis.unique())]
+                    range=[-0.1, len(x_axis.unique())],
+                    fixedrange=False  # Allow zooming
                 ),
                 yaxis=dict(
                     tickfont=dict(color='black'),
@@ -413,12 +420,13 @@ def register_callbacks(app):
                     zeroline=True,
                     zerolinewidth=1,
                     zerolinecolor='black',
+                    fixedrange=False  # Allow zooming
                 ),
                 margin=dict(
-                    l=50,   # left margin
-                    r=50,   # right margin
-                    b=150,  # bottom margin - increased to accommodate labels
-                    t=50,   # top margin
+                    l=60,   # left margin
+                    r=40,   # right margin
+                    b=max(100, min(200, len(x_axis.unique()) * 2)),  # Dynamic bottom margin
+                    t=60,   # top margin
                     pad=4   # padding between axis and labels
                 ),
             )
@@ -553,13 +561,16 @@ def register_callbacks(app):
                 yaxis_title="Values",
                 template="plotly_white",
                 width=scatter_width,
+                height=400,  # Fixed height for horizontal scrolling
+                autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
                     tickangle=90,
-                    tickfont=dict(size=max(12, 100 // len(x_axis.unique()))),
+                    tickfont=dict(size=max(8, min(14, 120 // len(x_axis.unique())))),
                     automargin=True,
                     ticks='outside',
                     ticklen=5,
-                    range= [-0.1, len(x_axis.unique())]
+                    range=[-0.1, len(x_axis.unique())],
+                    fixedrange=False  # Allow zooming
                 ),
                 yaxis=dict(
                     tickfont=dict(color='black'),
@@ -573,12 +584,13 @@ def register_callbacks(app):
                     zeroline=True,
                     zerolinewidth=1,
                     zerolinecolor='black',
+                    fixedrange=False  # Allow zooming
                 ),
                 margin=dict(
-                    l=50,   # left margin
-                    r=50,   # right margin
-                    b=150,  # bottom margin - increased to accommodate labels
-                    t=50,   # top margin
+                    l=60,   # left margin
+                    r=40,   # right margin
+                    b=max(100, min(200, len(x_axis.unique()) * 2)),  # Dynamic bottom margin
+                    t=60,   # top margin
                     pad=4   # padding between axis and labels
                 ),
             )
@@ -683,12 +695,17 @@ def register_callbacks(app):
                     )
                 )
 
+            # Calculate dynamic width based on the number of metabolites
+            num_metabolites = len(df["metabolite"].unique())
+            plot_width = max(800, num_metabolites * 40)
+
             # Update layout
             fig.update_layout(
                 title="Scatter Plot of Top 10 Metabolites for Selected Bacteria",
                 xaxis_title="Metabolite",
                 yaxis_title="Value",
                 template="plotly_white",
+                width=plot_width,
                 xaxis=dict(tickangle=90, showgrid=True),
                 yaxis=dict(showgrid=True),
                 legend_title="Bacteria",
@@ -696,12 +713,12 @@ def register_callbacks(app):
                 legend=dict(
                     y=1.15,
                     x=1,
-                    bgcolor='rgba(255, 255, 255, 0.8)',  # Optional: add background to legend
+                    bgcolor='rgba(255, 255, 255, 0.8)',
                     bordercolor='rgba(0,0,0,0.1)',
                     borderwidth=1
                 ),
                 margin=dict(
-                    t=100,  # Increase top margin to accommodate legend
+                    t=100,
                     b=50,
                     l=50,
                     r=50
@@ -1011,66 +1028,21 @@ def register_callbacks(app):
             Input("selected-bacteria", "value"),
         ]
     )
-    def gmm_heatmap_multiple(selected_metabolites, selected_bacteria):
-        # print(f"Selected Metabolites: {selected_metabolites}, Selected Bacteria: {selected_bacteria}")  # Debug log
-        logging.info(f"Selected Metabolites: {selected_metabolites}, Selected Bacteria: {selected_bacteria}")
+    def gmm_heatmap_multiple(selected_bacteria_cols, selected_metabolite_names):
+        logging.info(f"Selected Bacteria: {selected_bacteria_cols}, Selected Metabolites: {selected_metabolite_names}")
         
         table_name = get_table_name_from_tab("tab-a")
 
-        # Fetch all data
-        try:
-            df = get_all_columns_data_all_compounds(table_name)
-            if df is None or df.empty:
-                logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
-                return go.Figure()  # Return empty plot
-        except Exception as e:
-            logging.error("Error fetching data: %s", e)
-            return go.Figure()
-
-        
-        # Filter data based on selected metabolites and bacteria
-        try:
-            if selected_metabolites:
-                df = df[["name"] + selected_metabolites]
-            if selected_bacteria:
-                df = df[df["name"].isin(selected_bacteria)]
-            logging.info("Data filtered for heatmap.")
-            # print(f"Filtered DataFrame:\n{df.head()}")  # Debug log
-        except Exception as e:
-            logging.error("Error filtering data: %s", e)
-            return go.Figure()
+        if not selected_bacteria_cols or not selected_metabolite_names:
+            return create_empty_figure("No Selection", "Please select both bacteria and metabolites.")
 
         try:
-            # Convert numeric columns to numeric and set "name" as index
-            numeric_df = df.set_index("name").apply(pd.to_numeric, errors="coerce")
-            # print('numeric_df', numeric_df)
-            # Check for NaN values in the DataFrame
-            if numeric_df.isnull().values.any():
-                logging.warning("DataFrame contains NaN values. These will be ignored during summation.")
-                # print(f"DataFrame with NaN values:\n{numeric_df}")
-
-            # Compute the sum of all bacteria for each metabolite (row-wise sum)
-            sum_row = numeric_df.sum(axis=1, skipna=True)  
-
-            # Add the sum row as "Net Balance"
-            numeric_df["Net Balance"] = sum_row
-            numeric_df = pd.concat([numeric_df[["Net Balance"]].T, numeric_df.drop(columns="Net Balance").T]).T
-            # print('numeric_df1', numeric_df)
-            logging.info("Added row for the sum of selected bacteria.")
-            # print(f"Updated DataFrame with Net Balance row:\n{numeric_df.tail()}")  # Debug log
+            heatmap_data = get_heatmap_data(table_name, selected_metabolite_names, selected_bacteria_cols)
+            if heatmap_data is None or heatmap_data.empty:
+                return create_empty_figure("No Data", "No data found for the selected combination.")
         except Exception as e:
-            logging.error("Error adding Net Balance row: %s", e)
-            return go.Figure()
-
-
-        # Prepare heatmap data
-        try:
-            heatmap_data = numeric_df.T  # Transpose the DataFrame so metabolites are columns (x-axis), bacteria are rows (y-axis)
-            # print(f"Heatmap Data:\n{heatmap_data.head()}")  # Debug log
-            
-        except Exception as e:
-            logging.error("Error preparing data for heatmap: %s", e)
-            return go.Figure()
+            logging.error("Error fetching heatmap data: %s", e)
+            return create_empty_figure("Error", "An error occurred while fetching data.")
 
         # Create heatmap
         try:
@@ -1103,19 +1075,22 @@ def register_callbacks(app):
                 yaxis_title='Bacteria',
                 width=plot_width,  # Dynamic width
                 height=plot_height,  # Dynamic height
+                autosize=True,  # Enable responsive sizing
                 xaxis=dict(
                     tickangle=90,
                     side='bottom',
-                    tickfont=dict(size=10),
+                    tickfont=dict(size=max(8, min(12, 100 // num_metabolites))),
                     showgrid=True,
-                    gridcolor='rgba(0,0,0,0.1)'
+                    gridcolor='rgba(0,0,0,0.1)',
+                    fixedrange=False  # Allow zooming
                 ),
                 yaxis=dict(
-                    tickfont=dict(color='black', size=10),
+                    tickfont=dict(color='black', size=max(8, min(12, 100 // num_bacteria))),
                     showgrid=True,
-                    gridcolor='rgba(0,0,0,0.1)'
+                    gridcolor='rgba(0,0,0,0.1)',
+                    fixedrange=False  # Allow zooming
                 ),
-                margin=dict(l=150, r=50, t=80, b=100),  # Adjusted margins for better spacing
+                margin=dict(l=max(100, min(200, num_bacteria * 8)), r=50, t=80, b=max(80, min(150, num_metabolites * 3))),  # Dynamic margins
                 plot_bgcolor="white",
                 paper_bgcolor="white",
                 font=dict(size=10),
@@ -1135,110 +1110,33 @@ def register_callbacks(app):
             Input("selected-metabolites-heatmap-b", "value"),
         ]
     )
-    def gmm_heatmap_multiple_b(selected_bacteria, selected_metabolites):
-        print(f"[DEBUG] In Vivo Heatmap - Selected Bacteria: {selected_bacteria}")
-        print(f"[DEBUG] In Vivo Heatmap - Selected Metabolites: {selected_metabolites}")
-        logging.info(f"In Vivo Heatmap - Selected Bacteria: {selected_bacteria}, Selected Metabolites: {selected_metabolites}")
+    def gmm_heatmap_multiple_b(selected_bacteria_cols, selected_metabolite_names):
+        logging.info(f"In Vivo Heatmap - Selected Bacteria: {selected_bacteria_cols}, Selected Metabolites: {selected_metabolite_names}")
         
-        table_name = "in_vivo"  # Use in_vivo table for In Vivo tab
-        print(f"[DEBUG] Using table: {table_name}")
+        table_name = "in_vivo"
 
-        # Check if both selections are made
-        if not selected_bacteria or not selected_metabolites:
-            print("[DEBUG] Missing selections - returning empty figure")
-            return create_empty_figure("No Selection", "Please select both bacteria and metabolites to generate heatmap")
-
-        # Fetch all data
-        try:
-            print(f"[DEBUG] Fetching data from table: {table_name}")
-            df = get_all_columns_data_all_compounds(table_name)
-            print(f"[DEBUG] Data fetched - Shape: {df.shape if df is not None else 'None'}")
-            print(f"[DEBUG] Data columns: {list(df.columns) if df is not None else 'None'}")
-            
-            if df is None or df.empty:
-                logging.warning("DataFrame is empty or not fetched from table: %s", table_name)
-                print(f"[DEBUG] DataFrame is empty for table: {table_name}")
-                return create_empty_figure("No Data", f"No data available from table: {table_name}")
-        except Exception as e:
-            logging.error("Error fetching data: %s", e)
-            print(f"[DEBUG] Error fetching data: {e}")
-            return create_empty_figure("Error", f"Error fetching data: {str(e)}")
-
-        # Filter data based on selected metabolites (X-axis) and bacteria (Y-axis)
-        try:
-            print(f"[DEBUG] Original data shape: {df.shape}")
-            
-            # Filter by selected metabolites (rows in the dataframe)
-            if selected_metabolites:
-                df_filtered = df[df["name"].isin(selected_metabolites)]
-                print(f"[DEBUG] After metabolite filtering: {df_filtered.shape}")
-                print(f"[DEBUG] Selected metabolites found: {list(df_filtered['name'].unique())}")
-            else:
-                df_filtered = df
-            
-            # Filter by selected bacteria (columns in the dataframe)
-            if selected_bacteria:
-                # Keep 'name' column plus selected bacteria columns
-                columns_to_keep = ["name"] + [col for col in selected_bacteria if col in df_filtered.columns]
-                df_filtered = df_filtered[columns_to_keep]
-                print(f"[DEBUG] After bacteria filtering: {df_filtered.shape}")
-                print(f"[DEBUG] Selected bacteria columns found: {[col for col in selected_bacteria if col in df.columns]}")
-                print(f"[DEBUG] Selected bacteria columns missing: {[col for col in selected_bacteria if col not in df.columns]}")
-            
-            print(f"[DEBUG] Final filtered data shape: {df_filtered.shape}")
-            print(f"[DEBUG] Final filtered data columns: {list(df_filtered.columns)}")
-            
-            if df_filtered.empty:
-                return create_empty_figure("No Data", "No data found for selected bacteria and metabolites")
-                
-            logging.info("Data filtered for In Vivo heatmap.")
-        except Exception as e:
-            logging.error("Error filtering data: %s", e)
-            print(f"[DEBUG] Error filtering data: {e}")
-            return create_empty_figure("Error", f"Error filtering data: {str(e)}")
+        if not selected_bacteria_cols or not selected_metabolite_names:
+            return create_empty_figure("No Selection", "Please select both bacteria and metabolites.")
 
         try:
-            # Convert numeric columns to numeric and set "name" as index
-            print(f"[DEBUG] Converting to numeric and setting index...")
-            numeric_df = df_filtered.set_index("name").apply(pd.to_numeric, errors="coerce")
-            print(f"[DEBUG] Numeric conversion complete. Shape: {numeric_df.shape}")
-            print(f"[DEBUG] Numeric data sample:\n{numeric_df.head()}")
-            
-            # Check for NaN values in the DataFrame
-            if numeric_df.isnull().values.any():
-                logging.warning("DataFrame contains NaN values. These will be ignored during summation.")
-                print(f"[DEBUG] DataFrame contains NaN values")
+            heatmap_data = get_heatmap_data(table_name, selected_metabolite_names, selected_bacteria_cols)
 
-            # Compute the sum of all bacteria for each metabolite (row-wise sum)
-            sum_row = numeric_df.sum(axis=1, skipna=True)  
-            print(f"[DEBUG] Sum row calculated: {sum_row}")
-
-            # Add the sum row as "Net Balance"
-            numeric_df["Net Balance"] = sum_row
-            numeric_df = pd.concat([numeric_df[["Net Balance"]].T, numeric_df.drop(columns="Net Balance").T]).T
-            print(f"[DEBUG] Net Balance added. Final shape: {numeric_df.shape}")
-            logging.info("Added row for the sum of selected bacteria (In Vivo).")
+            if heatmap_data is None or heatmap_data.empty:
+                return create_empty_figure("No Data", "No data found for the selected combination.")
         except Exception as e:
-            logging.error("Error adding Net Balance row: %s", e)
-            print(f"[DEBUG] Error adding Net Balance row: {e}")
-            return create_empty_figure("Error", f"Error processing data: {str(e)}")
+            logging.error("Error fetching heatmap data for In Vivo: %s", e)
+            return create_empty_figure("Error", "An error occurred while fetching data.")
 
         # Prepare heatmap data
         try:
-            # Transpose the DataFrame so metabolites are columns (x-axis), bacteria are rows (y-axis)
-            heatmap_data = numeric_df.T  
-            print(f"[DEBUG] Heatmap data prepared. Shape: {heatmap_data.shape}")
-            print(f"[DEBUG] Heatmap X-axis (metabolites): {list(heatmap_data.columns)}")
-            print(f"[DEBUG] Heatmap Y-axis (bacteria): {list(heatmap_data.index)}")
-            
+            # The data is already processed by get_heatmap_data
+            pass
         except Exception as e:
             logging.error("Error preparing data for heatmap: %s", e)
-            print(f"[DEBUG] Error preparing heatmap data: {e}")
-            return create_empty_figure("Error", f"Error preparing heatmap: {str(e)}")
+            return create_empty_figure("Error", "Error preparing data for heatmap.")
 
         # Create heatmap
         try:
-            print(f"[DEBUG] Creating heatmap...")
             fig = go.Figure(data=go.Heatmap(
                 z=heatmap_data.values,  # Heatmap values
                 x=heatmap_data.columns,  # Metabolites (X-axis)
@@ -1268,19 +1166,22 @@ def register_callbacks(app):
                 yaxis_title='Bacteria',
                 width=plot_width,  # Dynamic width
                 height=plot_height,  # Dynamic height
+                autosize=True,  # Enable responsive sizing
                 xaxis=dict(
                     tickangle=90,
                     side='bottom',
-                    tickfont=dict(size=10),
+                    tickfont=dict(size=max(8, min(12, 100 // num_metabolites))),
                     showgrid=True,
-                    gridcolor='rgba(0,0,0,0.1)'
+                    gridcolor='rgba(0,0,0,0.1)',
+                    fixedrange=False  # Allow zooming
                 ),
                 yaxis=dict(
-                    tickfont=dict(color='black', size=10),
+                    tickfont=dict(color='black', size=max(8, min(12, 100 // num_bacteria))),
                     showgrid=True,
-                    gridcolor='rgba(0,0,0,0.1)'
+                    gridcolor='rgba(0,0,0,0.1)',
+                    fixedrange=False  # Allow zooming
                 ),
-                margin=dict(l=150, r=50, t=80, b=100),  # Adjusted margins for better spacing
+                margin=dict(l=max(100, min(200, num_bacteria * 8)), r=50, t=80, b=max(80, min(150, num_metabolites * 3))),  # Dynamic margins
                 plot_bgcolor="white",
                 paper_bgcolor="white",
                 font=dict(size=10),
@@ -1382,6 +1283,16 @@ def register_callbacks(app):
                 logging.warning("No data found for selected bacteria in In Vivo top metabolites")
                 return create_empty_figure("No Data", f"No data found for selected bacteria: {', '.join(selected_bacteria)}")
 
+            # Filter the DataFrame to include only the selected bacteria
+            if selected_bacteria:
+                df = df[df["bacteria"].isin(selected_bacteria)]
+            
+            if df.empty:
+                return create_empty_figure(
+                    "No Data Available for Selected Bacteria",
+                    "The selected bacteria are not in the top 10 for any metabolite."
+                )
+
             # Create scatter plot
             fig = go.Figure()
 
@@ -1397,12 +1308,17 @@ def register_callbacks(app):
                     )
                 )
 
+            # Calculate dynamic width based on the number of metabolites
+            num_metabolites = len(df["metabolite"].unique())
+            plot_width = max(800, num_metabolites * 40)
+
             # Update layout
             fig.update_layout(
                 title="In Vivo: Top 10 Metabolites for Selected Bacteria",
                 xaxis_title="Metabolite",
                 yaxis_title="Value",
                 template="plotly_white",
+                width=plot_width,
                 xaxis=dict(tickangle=90, showgrid=True),
                 yaxis=dict(showgrid=True),
                 legend_title="Bacteria",

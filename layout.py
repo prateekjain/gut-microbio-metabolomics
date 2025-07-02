@@ -1171,7 +1171,7 @@ main_layout = dbc.Container(
                                                         dcc.Graph(
                                                             id='gmm-scatter-top-plot',
                                                             className="gmm-scatter-top-plot",
-                                                            config={'responsive': True},  # Enable responsiveness
+                                                            config={'responsive': False},  # Enable responsiveness
                                                         ),
                                                         className="scatter-container-top",  # Inner scrollable container
                                                     ),
@@ -1223,7 +1223,7 @@ main_layout = dbc.Container(
                                                         dcc.Graph(
                                                             id='gmm-scatter-top-plot-b',
                                                             className="gmm-scatter-top-plot",
-                                                            config={'responsive': True},  # Enable responsiveness
+                                                            config={'responsive': False},  # Enable responsiveness
                                                         ),
                                                         className="scatter-container-top",  # Inner scrollable container
                                                     ),

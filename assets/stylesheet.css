@@ -393,6 +393,7 @@ body {
     border: 1px solid #e2e8f0;
     max-width: 1200px;
     width: 100%;
+    overflow: visible; /* Allow inner containers to handle their own overflow */
 }
 
 .outer-container:hover {
@@ -400,71 +401,130 @@ body {
     transform: translateY(-2px);
 }
 
-.scatter-container,
+/* Regular scatter plot containers - horizontal scroll only */
+.scatter-container {
+    background: #f7fafc;
+    border-radius: 12px;
+    padding: 1rem;
+    margin: 1rem auto;
+    border: 1px solid #e2e8f0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto; /* Horizontal scrolling for wide plots */
+    overflow-y: hidden; /* No vertical scrolling */
+    min-height: 400px; /* Minimum height for content */
+    max-height: 600px; /* Maximum height to prevent excessive vertical space */
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+}
+
+/* Top metabolites scatter containers - horizontal scroll with more height */
 .scatter-container-top {
     background: #f7fafc;
     border-radius: 12px;
     padding: 1rem;
     margin: 1rem auto;
     border: 1px solid #e2e8f0;
+    width: 100%;
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: auto; /* Horizontal scrolling for wide plots */
+    overflow-y: hidden; /* No vertical scrolling */
+    min-height: 500px; /* More height for top metabolites plots */
+    max-height: 800px; /* Allow more vertical space */
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
 }
 
+/* Heatmap containers - both horizontal and vertical scrolling */
 .scatter-container-heat {
     background: #f7fafc;
     border-radius: 12px;
     padding: 1rem;
     margin: 1rem auto;
     border: 1px solid #e2e8f0;
-    max-width: 100%;
     width: 100%;
-    min-height: 500px; /* Minimum height to show content properly */
-    max-height: 80vh; /* Use viewport height for better responsiveness */
-    height: 80vh; /* Fixed height for consistent container size */
+    max-width: 100%;
+    min-height: 600px; /* Minimum height for heatmaps */
+    max-height: 85vh; /* Use most of viewport height */
+    height: auto; /* Let content determine height up to max */
     overflow: auto; /* Enable both horizontal and vertical scrolling */
     position: relative;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     transition: box-shadow 0.3s ease;
+    display: block; /* Block display for proper scrolling */
 }
 
-/* Hover effect for heatmap container */
+/* Hover effects for all containers */
+.scatter-container:hover,
+.scatter-container-top:hover,
 .scatter-container-heat:hover {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
-/* Enhanced scrollbar styling for heatmap */
+/* Enhanced scrollbar styling for all plot containers */
+.scatter-container::-webkit-scrollbar,
+.scatter-container-top::-webkit-scrollbar,
 .scatter-container-heat::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
 }
 
+.scatter-container::-webkit-scrollbar-track,
+.scatter-container-top::-webkit-scrollbar-track,
 .scatter-container-heat::-webkit-scrollbar-track {
     background: #f1f5f9;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 1px solid #e2e8f0;
+    margin: 2px;
 }
 
+.scatter-container::-webkit-scrollbar-thumb,
+.scatter-container-top::-webkit-scrollbar-thumb,
 .scatter-container-heat::-webkit-scrollbar-thumb {
     background: linear-gradient(135deg, #667eea, #764ba2);
-    border-radius: 6px;
+    border-radius: 8px;
     border: 2px solid #f1f5f9;
     transition: all 0.3s ease;
 }
 
+.scatter-container::-webkit-scrollbar-thumb:hover,
+.scatter-container-top::-webkit-scrollbar-thumb:hover,
 .scatter-container-heat::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(135deg, #764ba2, #667eea);
     border-color: #e2e8f0;
+    transform: scale(1.1);
 }
 
+.scatter-container::-webkit-scrollbar-corner,
+.scatter-container-top::-webkit-scrollbar-corner,
 .scatter-container-heat::-webkit-scrollbar-corner {
-    background: #f1f5f9;
+    background: transparent;
+}
+
+/* Horizontal-only scrollbar styling for scatter containers */
+.scatter-container::-webkit-scrollbar:vertical {
+    width: 0px; /* Hide vertical scrollbar */
+}
+
+.scatter-container-top::-webkit-scrollbar:vertical {
+    width: 0px; /* Hide vertical scrollbar */
 }
 
 /* Heatmap plot specific styling */
+.gmm-scatter-top-plot {
+    min-width: 800px;
+    height: auto;
+}
+
 .gmm-heatmap-plot {
-    width: 100% !important;
-    height: 100% !important;
+    min-width: 800px;
+    height: auto;
 }
 
 /* Loading state for heatmap */
@@ -844,17 +904,36 @@ body {
         padding: 0 1rem;
     }
     
-    /* Adjust heatmap container for mobile */
-    .scatter-container-heat {
-        min-height: 400px; /* Smaller minimum height on mobile */
-        max-height: 70vh; /* Smaller max height on mobile */
-        height: 70vh; /* Fixed height for mobile */
+    /* Adjust containers for mobile */
+    .scatter-container {
+        min-height: 300px;
+        max-height: 50vh;
         padding: 0.5rem;
     }
     
+    .scatter-container-top {
+        min-height: 350px;
+        max-height: 60vh;
+        padding: 0.5rem;
+    }
+    
+    .scatter-container-heat {
+        min-height: 400px; /* Smaller minimum height on mobile */
+        max-height: 70vh; /* Smaller max height on mobile */
+        padding: 0.5rem;
+    }
+    
+    .scatter-container::-webkit-scrollbar,
+    .scatter-container-top::-webkit-scrollbar,
     .scatter-container-heat::-webkit-scrollbar {
         width: 8px;
         height: 8px;
+    }
+    
+    .scatter-container::-webkit-scrollbar-thumb,
+    .scatter-container-top::-webkit-scrollbar-thumb,
+    .scatter-container-heat::-webkit-scrollbar-thumb {
+        border-width: 1px;
     }
 }
 
@@ -1117,3 +1196,4 @@ a:focus,
         animation: none !important;
     }
 }
+

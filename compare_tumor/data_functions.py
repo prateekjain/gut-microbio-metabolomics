@@ -158,7 +158,7 @@ def selected_mz_cleaning(selected_mz):
         # print("updated mz value", selected_mz)
     return selected_mz
 
-@simple_cache(max_size=50, ttl=600)  # Cache for 10 minutes
+@simple_cache(max_size=50, ttl=600)
 def get_gmm_name(table_name):
     """
     Fetches all distinct values from the 'name' column in the specified table.
@@ -214,71 +214,46 @@ def get_all_columns_data(table_name, selected_compound):
     Returns:
         pd.DataFrame: Filtered DataFrame containing all rows for the selected compound.
     """
-    logging.info("Fetching data from table: %s", table_name)
-    print(f"Fetching data from table: {table_name}")  # Debug log
+    logging.info("Fetching data from table: %s for compound: %s", table_name, selected_compound)
 
     try:
-        # Connect to the database
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        logging.info("Database connection established")
-    except Exception as e:
-        logging.error("Error connecting to the database: %s", e)
-        print(f"Error connecting to database: {e}")  # Debug log
-        return None
+        with get_db_connection() as cursor:
+            # Fetch column names
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+            columns = [desc[0] for desc in cursor.description]
+            logging.info("Columns fetched: %s", columns)
 
-    try:
-        
-        # Fetch column names
-        cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-        columns = [desc[0] for desc in cursor.description]
-        logging.info("Columns fetched: %s", columns)
-        # print(f"Columns: {columns}")  # Debug log
+            # Ensure 'name' column exists
+            if 'name' not in columns:
+                logging.error("'name' column not found in table: %s", table_name)
+                return None
 
-        # Ensure 'name' column exists
-        if 'name' not in columns:
-            logging.error("'name' column not found in table: %s", table_name)
-            print(f"Error: 'name' column not found in table: {table_name}")  # Debug log
-            return None
+            # Fetch all rows for the selected compound
+            query = f"SELECT * FROM {table_name} WHERE name = %s"
+            cursor.execute(query, (selected_compound,))
+            data = cursor.fetchall()
 
-        # Fetch all rows for the selected compound
-        # Use parameterized query to prevent SQL injection
-        query = f"SELECT * FROM {table_name} WHERE name = %s"
-        
-        cursor.execute(query, (selected_compound,))
-        data = cursor.fetchall()
+            if not data:
+                logging.warning("No data found for compound: %s", selected_compound)
+                return None
 
-        if not data:
-            logging.warning("No data found for compound: %s", selected_compound)
-            print(f"Warning: No data found for compound: {selected_compound}")  # Debug log
-            return None
+            logging.info("Data fetched successfully for compound: %s", selected_compound)
 
-        logging.info("Data fetched successfully for compound: %s", selected_compound)
-        print(f"Data fetched successfully for compound: {selected_compound}. Rows: {data}")  # Debug log
+            # Create DataFrame
+            df = pd.DataFrame(data, columns=columns)
+            columns_to_exclude = ['mz', 'rt', 'list_2_match']
+            df = df.drop(columns=columns_to_exclude, errors='ignore')
+            logging.info("DataFrame created successfully for compound: %s", selected_compound)
+            
+            # Remove duplicate rows
+            df = df.drop_duplicates()
+            logging.info("Duplicate rows removed, resulting DataFrame shape: %s", df.shape)
 
-        # Create DataFrame
-        df = pd.DataFrame(data, columns=columns)
-        columns_to_exclude = [ 'mz', 'rt', 'list_2_match']
-        df = df.drop(columns=columns_to_exclude, errors='ignore')
-        logging.info("DataFrame created successfully for compound: %s", selected_compound)
-        # Remove duplicate rows
-        df = df.drop_duplicates()
-        logging.info("Duplicate rows removed, resulting DataFrame shape: %s", df.shape)
-        # print(f"DataFrame after removing duplicates:\n{df}")  # Debug log
-
-        return df
+            return df
 
     except Exception as e:
-        logging.error("Error fetching data: %s", e)
-        print(f"Error fetching data: {e}")  # Debug log
+        logging.error("Error fetching data for compound %s in table %s: %s", selected_compound, table_name, e)
         return None
-
-    finally:
-        # Ensure cursor and connection are closed
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
 
 
 @simple_cache(max_size=10, ttl=900)  # Cache for 15 minutes - larger tables need longer cache
@@ -326,6 +301,7 @@ def get_all_columns_data_all_compounds(table_name):
 
 
 
+@simple_cache(max_size=50, ttl=600)
 def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
     """
     Fetches all metabolites for the selected bacteria where the bacteria collectively rank among the top 10 producers.
@@ -342,73 +318,66 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
         return None
 
     try:
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
+        with get_db_connection() as cursor:
+            # Fetch column names dynamically
+            cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
+            all_columns = [row[0] for row in cursor.fetchall()]
+            logging.info("Columns fetched from table: %s", all_columns)
 
-        # Fetch column names dynamically
-        cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
-        all_columns = [row[0] for row in cursor.fetchall()]
-        logging.info("Columns fetched from table: %s", all_columns)
+            # Get only numeric bacterial columns, excluding metadata columns
+            cursor.execute(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+                AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+            """, (table_name,))
+            bacteria_columns = [row[0] for row in cursor.fetchall()]
+            logging.info("Bacteria columns determined dynamically: %s", bacteria_columns)
 
-        # Get only numeric bacterial columns, excluding metadata columns
-        cursor.execute(f"""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = %s 
-            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
-            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
-        """, (table_name,))
-        bacteria_columns = [row[0] for row in cursor.fetchall()]
-        logging.info("Bacteria columns determined dynamically: %s", bacteria_columns)
+            # Build the dynamic UNPIVOT query with properly quoted column names, casting to text
+            unpivot_parts = []
+            for col in bacteria_columns:
+                query_part = f"SELECT name AS metabolite, '{col}' AS bacteria, " + f'"{col}"' + f"::text AS value FROM {table_name}"
+                unpivot_parts.append(query_part)
+            unpivot_query = " UNION ALL ".join(unpivot_parts)
+            query = f"""
+            WITH UnpivotedData AS (
+                {unpivot_query}
+            ),
+            RankedBacteria AS (
+                SELECT
+                    metabolite,
+                    bacteria,
+                    value,
+                    RANK() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
+                FROM UnpivotedData
+            )
+            SELECT * FROM RankedBacteria WHERE rank <= 10;
+            """
+            logging.info("Executing query:\n%s", query)
 
-        # Build the dynamic UNPIVOT query with properly quoted column names, casting to text
-        unpivot_parts = []
-        for col in bacteria_columns:
-            query_part = f"SELECT name AS metabolite, '{col}' AS bacteria, " + f'"{col}"' + f"::text AS value FROM {table_name}"
-            unpivot_parts.append(query_part)
-        unpivot_query = " UNION ALL ".join(unpivot_parts)
-        query = f"""
-        WITH UnpivotedData AS (
-            {unpivot_query}
-        ),
-        RankedBacteria AS (
-            SELECT
-                metabolite,
-                bacteria,
-                value,
-                RANK() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
-            FROM UnpivotedData
-        )
-        SELECT * FROM RankedBacteria WHERE rank <= 10;
-        """
-        logging.info("Executing query:\n%s", query)
+            cursor.execute(query)
+            data = cursor.fetchall()
+            print('data here',data)
 
-        cursor.execute(query, (selected_bacteria,))
-        data = cursor.fetchall()
-        print('data here',data)
+            if not data:
+                logging.warning("No data found for selected bacteria in the top 10 metabolites: %s", selected_bacteria)
+                return None
 
-        if not data:
-            logging.warning("No data found for selected bacteria in the top 10 metabolites: %s", selected_bacteria)
-            return None
-
-        # Create DataFrame
-        columns = [desc[0] for desc in cursor.description]
-        df = pd.DataFrame(data, columns=columns)
-        logging.info("Data fetched successfully for selected bacteria in the top 10 metabolites.")
-        return df
+            # Create DataFrame
+            columns = [desc[0] for desc in cursor.description]
+            df = pd.DataFrame(data, columns=columns)
+            logging.info("Data fetched successfully for selected bacteria in the top 10 metabolites.")
+            return df
 
     except Exception as e:
         logging.error("Error fetching data: %s", e)
         return None
 
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
-
  
 
+@simple_cache(max_size=50, ttl=600)
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
     """
     Fetches metabolites where ALL selected bacteria appear together in the top 10 producers
@@ -419,108 +388,114 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
         return None
 
     try:
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
+        with get_db_connection() as cursor:
+            # Get only numeric bacterial columns, excluding metadata columns
+            cursor.execute(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+                AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
+            """, (table_name,))
+            bacteria_columns = [row[0] for row in cursor.fetchall()]
 
-        # Get only numeric bacterial columns, excluding metadata columns
-        cursor.execute(f"""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = %s 
-            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
-            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
-        """, (table_name,))
-        bacteria_columns = [row[0] for row in cursor.fetchall()]
+            # Build CROSS JOIN LATERAL (VALUES ...) clause to unpivot all bacterial columns in a single scan
+            lateral_values = ",\n        ".join([
+                f"('{col}', t.\"{col}\"::double precision)" for col in bacteria_columns
+            ])
 
-        # Get top 10 data with properly quoted column names, casting to text
-        unpivot_parts = []
-        for col in bacteria_columns:
-            query_part = f"SELECT DISTINCT name AS metabolite, '{col}' AS bacteria, " + f'"{col}"' + f"::text AS value FROM {table_name}"
-            unpivot_parts.append(query_part)
-        unpivot_union = " UNION ALL ".join(unpivot_parts)
-        
-        base_query = f"""
-        WITH UnpivotedData AS (
-            {unpivot_union}
-        ),
-        RankedBacteria AS (
-            SELECT DISTINCT ON (metabolite, bacteria)
-                metabolite,
-                bacteria,
-                value,
-                ROW_NUMBER() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
-            FROM UnpivotedData
-            WHERE value > 0
-        ),
-        Top10Distinct AS (
-            SELECT DISTINCT
-                metabolite,
-                bacteria,
-                value,
-                rank
-            FROM RankedBacteria
-            WHERE rank <= 10
-        )
-        SELECT 
-            metabolite,
-            bacteria,
-            value,
-            rank
-        FROM Top10Distinct
-        ORDER BY metabolite, rank;
-        """
-        
-        cursor.execute(base_query)
-        columns = ['metabolite', 'bacteria', 'value', 'rank']
-        top_10_df = pd.DataFrame(cursor.fetchall(), columns=columns)
+            # Prepare placeholders for selected bacteria to ensure safe parameterization
+            bacteria_placeholders = ", ".join(["%s"] * len(selected_bacteria))
 
-        # Print all top 10 producers for each metabolite
-        print("\nTop 10 Bacteria Producers for each Metabolite:")
-        print("=" * 50)
-        for metabolite in top_10_df['metabolite'].unique():
-            bacteria_list = top_10_df[top_10_df['metabolite'] == metabolite]['bacteria'].tolist()
-            print(f"\nMetabolite: {metabolite}")
-            print(f"Top 10 Producers: {', '.join(bacteria_list)}")
-        print("=" * 50)
+            base_query = f"""
+            WITH unpivoted AS (
+                SELECT t.name AS metabolite,
+                       v.bacteria,
+                       v.value
+                FROM {table_name} t
+                CROSS JOIN LATERAL (VALUES
+                    {lateral_values}
+                ) v(bacteria, value)
+                WHERE v.value > 0
+            ),
+            ranked AS (
+                SELECT metabolite,
+                       bacteria,
+                       value,
+                       ROW_NUMBER() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
+                FROM unpivoted
+            ),
+            top10 AS (
+                SELECT *
+                FROM ranked
+                WHERE rank <= 10
+            ),
+            metabolites_with_all AS (
+                SELECT metabolite
+                FROM top10
+                WHERE bacteria IN ({bacteria_placeholders})
+                GROUP BY metabolite
+                HAVING COUNT(DISTINCT bacteria) = {len(selected_bacteria)}
+            )
+            SELECT t.metabolite,
+                   t.bacteria,
+                   t.value,
+                   t.rank
+            FROM top10 t
+            JOIN metabolites_with_all m USING (metabolite)
+            WHERE t.bacteria IN ({bacteria_placeholders})
+            ORDER BY t.metabolite, t.rank;
+            """
 
-        # Find metabolites where ALL selected bacteria appear in top 10
-        valid_metabolites = []
-        for metabolite in top_10_df['metabolite'].unique():
-            metabolite_bacteria = set(top_10_df[top_10_df['metabolite'] == metabolite]['bacteria'])
-            if all(bacteria in metabolite_bacteria for bacteria in selected_bacteria):
-                valid_metabolites.append(metabolite)
+            # Execute query with selected bacteria passed twice (for the IN clause in metabolites_with_all and final filter)
+            params = tuple(selected_bacteria) + tuple(selected_bacteria)
+            cursor.execute(base_query, params)
 
-        if not valid_metabolites:
-            logging.warning("No metabolites found where all selected bacteria appear together in top 10")
-            return None
+            columns = ['metabolite', 'bacteria', 'value', 'rank']
+            top_10_df = pd.DataFrame(cursor.fetchall(), columns=columns)
 
-        # Filter data for selected bacteria and valid metabolites
-        result_df = top_10_df[
-            (top_10_df['bacteria'].isin(selected_bacteria)) & 
-            (top_10_df['metabolite'].isin(valid_metabolites))
-        ]
+            # Print all top 10 producers for each metabolite
+            print("\nTop 10 Bacteria Producers for each Metabolite:")
+            print("=" * 50)
+            for metabolite in top_10_df['metabolite'].unique():
+                bacteria_list = top_10_df[top_10_df['metabolite'] == metabolite]['bacteria'].tolist()
+                print(f"\nMetabolite: {metabolite}")
+                print(f"Top 10 Producers: {', '.join(bacteria_list)}")
+            print("=" * 50)
 
-        if result_df.empty:
-            logging.warning("No data found for selected bacteria")
-            return None
+            # Find metabolites where ALL selected bacteria appear in top 10
+            valid_metabolites = []
+            for metabolite in top_10_df['metabolite'].unique():
+                metabolite_bacteria = set(top_10_df[top_10_df['metabolite'] == metabolite]['bacteria'])
+                if all(bacteria in metabolite_bacteria for bacteria in selected_bacteria):
+                    valid_metabolites.append(metabolite)
 
-        # Debug information
-        print("\nSelected bacteria found together in these metabolites:")
-        for metabolite in result_df['metabolite'].unique():
-            bacteria_ranks = result_df[result_df['metabolite'] == metabolite][['bacteria', 'rank']].values
-            print(f"\nMetabolite: {metabolite}")
-            print("Bacteria and their ranks:", bacteria_ranks)
+            if not valid_metabolites:
+                logging.warning("No metabolites found where all selected bacteria appear together in top 10")
+                return None
 
-        return result_df
+            # Filter data for selected bacteria and valid metabolites
+            result_df = top_10_df[
+                (top_10_df['bacteria'].isin(selected_bacteria)) & 
+                (top_10_df['metabolite'].isin(valid_metabolites))
+            ]
+
+            if result_df.empty:
+                logging.warning("No data found for selected bacteria")
+                return None
+
+            # Debug information
+            print("\nSelected bacteria found together in these metabolites:")
+            for metabolite in result_df['metabolite'].unique():
+                bacteria_ranks = result_df[result_df['metabolite'] == metabolite][['bacteria', 'rank']].values
+                print(f"\nMetabolite: {metabolite}")
+                print("Bacteria and their ranks:", bacteria_ranks)
+
+            return result_df
 
     except Exception as e:
         logging.error("Error fetching data: %s", e)
         return None
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            connection.close()
 
 
 @simple_cache(max_size=100, ttl=300)  # Cache metabolite data for 5 minutes
@@ -538,18 +513,18 @@ def get_metabolite_data(table_name, metabolite):
             """, (table_name,))
             bacterial_columns = [row[0] for row in cursor.fetchall()]
 
-            # Create UNPIVOT query with properly quoted column names, casting values to text to avoid type mismatches
+            # Create UNPIVOT query with properly quoted column names, casting values to a numeric type
             unpivot_parts = []
             for col in bacterial_columns:
-                query_part = f"SELECT name as metabolite, '{col}' as bacteria, " + f'"{col}"' + f"::text as value FROM {table_name}"
+                query_part = f"SELECT name as metabolite, '{col}' as bacteria, " + f'"{col}"' + f"::double precision as value FROM {table_name}"
                 unpivot_parts.append(query_part)
             unpivot_query = " UNION ALL ".join(unpivot_parts)
             
             query = f"""
             WITH unpivoted AS ({unpivot_query})
-            SELECT metabolite, bacteria, value::float AS value 
+            SELECT metabolite, bacteria, value
             FROM unpivoted 
-            WHERE metabolite = %s AND value IS NOT NULL AND value != ''
+            WHERE metabolite = %s AND value IS NOT NULL
             """
             
             cursor.execute(query, (metabolite,))
@@ -638,35 +613,35 @@ def get_bacteria_names(table_name):
     Returns:
         list: List of unique bacteria names.
     """
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        with get_db_connection() as cursor:
+            # Columns to exclude
+            columns_to_exclude = ['mz', 'rt', 'list_2_match']
+            
+            # Fetch all columns in the table
+            cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'")
+            all_columns = [row[0] for row in cursor.fetchall()]
 
-    # Columns to exclude
-    columns_to_exclude = ['mz', 'rt', 'list_2_match']
-    
-    # Fetch all columns in the table
-    cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'")
-    all_columns = [row[0] for row in cursor.fetchall()]
-
-    # Exclude the specified columns
-    columns_to_include = [col for col in all_columns if col not in columns_to_exclude]
-    
-    # Create the query to select distinct names, excluding the unwanted columns
-    query = f"SELECT DISTINCT name FROM {table_name} WHERE name IS NOT NULL"
-    
-    # Execute the query to get distinct bacteria names
-    cursor.execute(query)
-    names = [row[0] for row in cursor.fetchall()]
-    cursor.close()
-    connection.close()
-    
-    return names
+            # Exclude the specified columns
+            columns_to_include = [col for col in all_columns if col not in columns_to_exclude]
+            
+            # Create the query to select distinct names, excluding the unwanted columns
+            query = f"SELECT DISTINCT name FROM {table_name} WHERE name IS NOT NULL"
+            
+            # Execute the query to get distinct bacteria names
+            cursor.execute(query)
+            names = [row[0] for row in cursor.fetchall()]
+            
+            return names
+    except Exception as e:
+        logging.error(f"Error getting bacteria names from table '{table_name}': {e}")
+        return []
 
 
 @simple_cache(max_size=100, ttl=300)  # Cache for 5 minutes
 def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, order="desc"):
     """
-    Enhanced function to fetch top/bottom N bacteria values with better data processing
+    Fetches top/bottom N bacteria values for a selected compound, with processing offloaded to the database.
     
     Args:
         table_name (str): Name of the table in the database.
@@ -679,7 +654,7 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
     """
     try:
         with get_db_connection() as cursor:
-            # Get only numeric bacterial columns using cached function
+            # Get only numeric bacterial columns
             cursor.execute(f"""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -688,52 +663,54 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
                 AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
             """, (table_name,))
             bacterial_columns = [row[0] for row in cursor.fetchall()]
-            
-            if not bacterial_columns:
-                logging.error("No bacterial columns found in the table: %s", table_name)
-                return None
 
-            # Optimized query using column selection and WHERE clause
-            quoted_columns = [f'"{col}"' for col in bacterial_columns]
-            query = f"SELECT name, {', '.join(quoted_columns)} FROM {table_name} WHERE name = %s"
-            cursor.execute(query, (selected_compound,))
+            if not bacterial_columns:
+                logging.warning(f"No bacterial columns found in table {table_name}")
+                return pd.DataFrame()
+
+            # Build the unpivot part of the query
+            unpivot_parts = []
+            for col in bacterial_columns:
+                # Ensure column names are quoted to handle special characters
+                unpivot_parts.append(f"SELECT name as metabolite, '{col}' as bacteria, \"{col}\"::float as value FROM {table_name}")
+            
+            unpivot_query = " UNION ALL ".join(unpivot_parts)
+
+            # Build the final query with ranking
+            sql_order = "DESC" if order.lower() == "desc" else "ASC"
+            
+            query = f"""
+            WITH UnpivotedData AS (
+                {unpivot_query}
+            ),
+            RankedBacteria AS (
+                SELECT
+                    metabolite,
+                    bacteria,
+                    value,
+                    ROW_NUMBER() OVER(PARTITION BY metabolite ORDER BY value {sql_order} NULLS LAST) as rn
+                FROM UnpivotedData
+                WHERE metabolite = %s AND value IS NOT NULL AND value > 0
+            )
+            SELECT metabolite, bacteria, value
+            FROM RankedBacteria
+            WHERE rn <= %s
+            """
+            
+            cursor.execute(query, (selected_compound, top_n))
             data = cursor.fetchall()
 
             if not data:
-                logging.warning("No data found for compound: %s", selected_compound)
-                return None
-
-            # Create DataFrame with proper data types
-            df = pd.DataFrame(data, columns=["name"] + bacterial_columns)
+                logging.warning(f"No data found for compound: {selected_compound}")
+                return pd.DataFrame()
             
-            # Optimized melting with type conversion
-            df_melted = df.melt(
-                id_vars=["name"], 
-                var_name="bacteria", 
-                value_name="value"
-            ).rename(columns={"name": "metabolite"})
-            
-            # Vectorized data cleaning and conversion
-            df_clean = clean_dataframe_values(df_melted, 'value')
-            
-            if df_clean.empty:
-                logging.warning(f"No valid numeric data found for compound: {selected_compound}")
-                return None
-
-            # Efficient sorting and selection
-            ascending = order.lower() == "asc"
-            df_result = (df_clean
-                        .sort_values(by="value", ascending=ascending)
-                        .drop_duplicates(subset="bacteria", keep="first")
-                        .head(top_n)
-                        .reset_index(drop=True))
-            
-            logging.info(f"Processed {len(df_result)} {order.upper()} {top_n} values for {selected_compound}")
-            return df_result
+            df = pd.DataFrame(data, columns=['metabolite', 'bacteria', 'value'])
+            logging.info(f"Fetched {len(df)} {order.upper()} {top_n} values for {selected_compound} from database.")
+            return df
 
     except Exception as e:
-        logging.error("Error fetching top/bottom values: %s", e)
-        return None
+        logging.error(f"Error fetching top/bottom values for {selected_compound}: {e}")
+        return pd.DataFrame()
 
 # ===== ENHANCED DATA PROCESSING UTILITIES =====
 def clean_dataframe_values(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
@@ -822,49 +799,53 @@ def batch_process_data(data_list: List[pd.DataFrame]) -> pd.DataFrame:
 
 
 
+@simple_cache(max_size=50, ttl=900)
 def get_mz_values(table_name):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        with get_db_connection() as cursor:
+            query_mz_values = f"SELECT DISTINCT mz FROM {table_name}"
+            cursor.execute(query_mz_values)
+            mz_values = [row[0] for row in cursor.fetchall()]
 
-    query_mz_values = f"SELECT DISTINCT mz FROM {table_name}"
-    cursor.execute(query_mz_values)
-    mz_values = [row[0] for row in cursor.fetchall()]
-
-    cursor.close()
-    connection.close()
-    # print("mzval", mz_values[1])
-    mz_values = sorted(mz_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-    # print("mz_values", mz_values)
-    return mz_values
+            # print("mzval", mz_values[1])
+            mz_values = sorted(mz_values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+            # print("mz_values", mz_values)
+            return mz_values
+    except Exception as e:
+        logging.error(f"Error getting mz values from table '{table_name}': {e}")
+        return []
 
 
+@simple_cache(max_size=20, ttl=900)
 def get_cecum_and_ascending_mz_values(regions):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        with get_db_connection() as cursor:
+            # Initialize an empty set to store the Mz values
+            mz_values_set = set()
 
-    # Initialize an empty set to store the Mz values
-    mz_values_set = set()
+            # Loop through each region and dynamically generate the SQL query
+            for region in regions:
+                # SQL query to get Mz values with q_fdr < 0.05 in the specified region
+                query = f"SELECT DISTINCT mz FROM {region} WHERE q_fdr <= 0.05"
+                cursor.execute(query)
+                region_mz_values = {row[0] for row in cursor.fetchall()}
 
-    # Loop through each region and dynamically generate the SQL query
-    for region in regions:
-        # SQL query to get Mz values with q_fdr < 0.05 in the specified region
-        query = f"SELECT DISTINCT mz FROM {region} WHERE q_fdr <= 0.05"
-        cursor.execute(query)
-        region_mz_values = {row[0] for row in cursor.fetchall()}
+                # If it's the first region, set the Mz values directly
+                if not mz_values_set:
+                    mz_values_set = region_mz_values
+                else:
+                    # If it's not the first region, take the intersection with the existing Mz values
+                    mz_values_set &= region_mz_values
 
-        # If it's the first region, set the Mz values directly
-        if not mz_values_set:
-            mz_values_set = region_mz_values
-        else:
-            # If it's not the first region, take the intersection with the existing Mz values
-            mz_values_set &= region_mz_values
+            mz_values_set = sorted(mz_values_set, key=lambda s: s.casefold())
 
-    connection.close()
-    mz_values_set = sorted(mz_values_set, key=lambda s: s.casefold())
-
-    return mz_values_set
+            return mz_values_set
+    except Exception as e:
+        logging.error(f"Error getting cecum and ascending mz values: {e}")
+        return []
 
 
+@simple_cache(max_size=20, ttl=900)
 def get_one_qfdr_value(all_regions):
     # Get Mz values for each region
     region_mz_values = {region: set(
@@ -902,248 +883,249 @@ def get_one_qfdr_value(all_regions):
     return options, default_value
 
 
+@simple_cache(max_size=50, ttl=900)
 def get_q05_mz_values(region):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        with get_db_connection() as cursor:
+            query = f"SELECT DISTINCT mz FROM {region} WHERE q_fdr <= 0.05"
+            cursor.execute(query)
+            q05_mz_values = {row[0] for row in cursor.fetchall()}
 
-    query = f"SELECT DISTINCT mz FROM {region} WHERE q_fdr <= 0.05"
-    cursor.execute(query)
-    q05_mz_values = {row[0] for row in cursor.fetchall()}
-
-    connection.close()
-    q05_mz_values = sorted(q05_mz_values,key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-    
-    return q05_mz_values
+            q05_mz_values = sorted(q05_mz_values,key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+            
+            return q05_mz_values
+    except Exception as e:
+        logging.error(f"Error getting q05 mz values for region {region}: {e}")
+        return []
 
 
+@simple_cache(max_size=2, ttl=1800)
 def get_q05_mz_forest_values():
-    # Establish a connection to the database
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        # Establish a connection to the database
+        with get_db_connection() as cursor:
+            # List of columns to be selected based on the condition
+            columns = ["mz"]
 
-    # List of columns to be selected based on the condition
-    columns = ["mz"]
+            # List of regions
+            regions = ["cecum", "ascending", "transverse",
+                    "descending", "sigmoid", "rectosigmoid", "rectum"]
+            values = []
 
-    # List of regions
-    regions = ["cecum", "ascending", "transverse",
-               "descending", "sigmoid", "rectosigmoid", "rectum"]
-    values = []
+            # Construct the query for each region separately
+            for reg in regions:
+                # Construct the column name for the current region's Pvalue column
+                pvalue_column = f"Pvalue_{reg}"
 
-    # Construct the query for each region separately
-    for reg in regions:
-        # Construct the column name for the current region's Pvalue column
-        pvalue_column = f"Pvalue_{reg}"
+                # Construct the query to select distinct mz values where q_fdr <= 0.05 for the current region
+                query = f"SELECT DISTINCT mz FROM forest_plot WHERE {pvalue_column} <= 0.05"
+                # Add conditions for other regions
+                for other_reg in regions:
+                    if other_reg != reg:
+                        other_pvalue_column = f"Pvalue_{other_reg}"
+                        query += f" AND {other_pvalue_column} > 0.05"
 
-        # Construct the query to select distinct mz values where q_fdr <= 0.05 for the current region
-        query = f"SELECT DISTINCT mz FROM forest_plot WHERE {pvalue_column} <= 0.05"
-        # Add conditions for other regions
-        for other_reg in regions:
-            if other_reg != reg:
-                other_pvalue_column = f"Pvalue_{other_reg}"
-                query += f" AND {other_pvalue_column} > 0.05"
+                # Execute the query
+                cursor.execute(query)
+                columns.append(pvalue_column)
+                # Fetch all the rows and extract the mz values
+                q05_mz_values = {row[0] for row in cursor.fetchall()}
+                # print("q05_mz_values", list(q05_mz_values))
+                # print("\n")
+                values.extend(list(q05_mz_values))
+                # print("values", values)
 
-        # Execute the query
-        cursor.execute(query)
-        columns.append(pvalue_column)
-        # Fetch all the rows and extract the mz values
-        q05_mz_values = {row[0] for row in cursor.fetchall()}
-        # print("q05_mz_values", list(q05_mz_values))
-        # print("\n")
-        values.extend(list(q05_mz_values))
-        # print("values", values)
-
-    # Close the database connection
-    connection.close()
-    values = sorted(values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-    return values
+            values = sorted(values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
+            return values
+    except Exception as e:
+        logging.error(f"Error getting q05 mz forest values: {e}")
+        return []
 
 
+@simple_cache(max_size=20, ttl=900)
 def get_linear_values(regions):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        with get_db_connection() as cursor:
+            # Initialize an empty set to store the Mz values
+            mz_values_set = set()
 
-    # Initialize an empty set to store the Mz values
-    mz_values_set = set()
+            # Loop through each region and dynamically generate the SQL query
+            for region in regions:
+                query = f"SELECT DISTINCT mz FROM {region} WHERE q_fdr <= 0.05"
+                cursor.execute(query)
+                region_mz_values = {row[0] for row in cursor.fetchall()}
 
-    # Loop through each region and dynamically generate the SQL query
-    for region in regions:
-        query = f"SELECT DISTINCT mz FROM {region} WHERE q_fdr <= 0.05"
-        cursor.execute(query)
-        region_mz_values = {row[0] for row in cursor.fetchall()}
+                # If it's the first region, set the Mz values directly
+                if not mz_values_set or region_mz_values:
+                    mz_values_set |= region_mz_values
 
-        # If it's the first region, set the Mz values directly
-        if not mz_values_set or region_mz_values:
-            mz_values_set |= region_mz_values
+            mz_values_set = sorted(mz_values_set,key=lambda s: str(s).casefold() if isinstance(s, str) else s)
 
-    connection.close()
-    mz_values_set = sorted(mz_values_set,key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-
-    return mz_values_set
+            return mz_values_set
+    except Exception as e:
+        logging.error(f"Error getting linear values: {e}")
+        return []
 
 
 def get_case_columns_query(table_name, selected_mz):
-    # Connect to the database
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-    # # Get all column names from the table
-    cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-    all_columns = [desc[0] for desc in cursor.description]
-    # print(all_columns)
-    # Construct the SQL query dynamically with quoted column names
-    case_columns = [f'"{col}"' for col in all_columns if '_case' in col.lower()]
-    control_columns = [f'"{col}"' for col in all_columns if '_control' in col.lower()]
-    query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
-    query_control = f"SELECT {', '.join(control_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
-    get_side_val = f"SELECT q_fdr, log_fc_matched FROM {table_name} WHERE mz = '{selected_mz}'"
-    # print("query_case" ,query_case)
-    # print("query_control", query_control)
+    try:
+        # Connect to the database
+        with get_db_connection() as cursor:
+            # # Get all column names from the table
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+            all_columns = [desc[0] for desc in cursor.description]
+            # print(all_columns)
+            # Construct the SQL query dynamically with quoted column names
+            case_columns = [f'"{col}"' for col in all_columns if '_case' in col.lower()]
+            control_columns = [f'"{col}"' for col in all_columns if '_control' in col.lower()]
+            query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
+            query_control = f"SELECT {', '.join(control_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
+            get_side_val = f"SELECT q_fdr, log_fc_matched FROM {table_name} WHERE mz = '{selected_mz}'"
+            # print("query_case" ,query_case)
+            # print("query_control", query_control)
 
-    cursor.execute(query_case)
-    case_results = cursor.fetchall()
-    # print("heelooo5",case_results)
+            cursor.execute(query_case)
+            case_results = cursor.fetchall()
+            # print("heelooo5",case_results)
 
-    cursor.execute(query_control)
-    control_results = cursor.fetchall()
-    # print("heelooo4",control_results)
+            cursor.execute(query_control)
+            control_results = cursor.fetchall()
+            # print("heelooo4",control_results)
 
-    cursor.execute(get_side_val)
-    final_get_side_val = cursor.fetchall()
-    # print("heelooo6",final_get_side_val)
+            cursor.execute(get_side_val)
+            final_get_side_val = cursor.fetchall()
+            # print("heelooo6",final_get_side_val)
 
-    # Close the cursor and connection
-    cursor.close()
-    connection.close()
-    # print("heelooo7",case_results, control_results, final_get_side_val)
-    return case_results, control_results, final_get_side_val
+            # print("heelooo7",case_results, control_results, final_get_side_val)
+            return case_results, control_results, final_get_side_val
+    except Exception as e:
+        logging.error(f"Error in get_case_columns_query for table {table_name} and mz {selected_mz}: {e}")
+        return [], [], []
 
 
 def get_case_columns_vs_query(columName, selected_mz, table_name):
-    # Connect to the database
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        # Connect to the database
+        with get_db_connection() as cursor:
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+            all_columns = [desc[0] for desc in cursor.description]
+            # print("all_columns", all_columns)
+            case_columns = [f'"{col}"' for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()]
+            query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
 
-    cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-    all_columns = [desc[0] for desc in cursor.description]
-    # print("all_columns", all_columns)
-    case_columns = [f'"{col}"' for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()]
-    query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
+            cursor.execute(query_case)
+            case_results = cursor.fetchall()
 
-    cursor.execute(query_case)
-    case_results = cursor.fetchall()
-
-    case_values = [item for sublist in case_results for item in sublist]
-    # Close the cursor and connection
-    cursor.close()
-    connection.close()
-
-    return case_results
+            case_values = [item for sublist in case_results for item in sublist]
+            return case_results
+    except Exception as e:
+        logging.error(f"Error in get_case_columns_vs_query for table {table_name} and mz {selected_mz}: {e}")
+        return []
 
 
 def get_case_columns_linear_query(columName, selected_mz, table_name):
-    # Connect to the database
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
+    try:
+        # Connect to the database
+        with get_db_connection() as cursor:
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+            all_columns = [desc[0] for desc in cursor.description]
+            # print("all_columns", all_columns)
 
-    cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-    all_columns = [desc[0] for desc in cursor.description]
-    # print("all_columns", all_columns)
+            case_columns = [f'"{col}"' for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()]
+            query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
+            cursor.execute(query_case)
+            case_results = cursor.fetchall()
 
-    case_columns = [f'"{col}"' for col in all_columns if f'case_{columName}_' in col.lower() and 'vs' not in col.lower()]
-    query_case = f"SELECT {', '.join(case_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
-    cursor.execute(query_case)
-    case_results = cursor.fetchall()
+            get_side_val = f"SELECT q_fdr FROM {table_name} WHERE mz = '{selected_mz}'"
+            cursor.execute(get_side_val)
+            qfdr_results = cursor.fetchall()
 
-    get_side_val = f"SELECT q_fdr FROM {table_name} WHERE mz = '{selected_mz}'"
-    cursor.execute(get_side_val)
-    qfdr_results = cursor.fetchall()
-
-    case_values = [item for sublist in case_results for item in sublist]
-    # Close the cursor and connection
-    cursor.close()
-    connection.close()
-
-    return case_results, qfdr_results
+            case_values = [item for sublist in case_results for item in sublist]
+            return case_results, qfdr_results
+    except Exception as e:
+        logging.error(f"Error in get_case_columns_linear_query for table {table_name} and mz {selected_mz}: {e}")
+        return [], []
 
 
 def vs_columnNames(table_name, fig, selected_mz, region_call):
-    connection = psycopg2.connect(db_url)
-    cursor = connection.cursor()
-    col_vs = []
+    try:
+        with get_db_connection() as cursor:
+            col_vs = []
 
-    cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-    all_columns = [desc[0] for desc in cursor.description]
-    vs_columns = [f'"{col}"' for col in all_columns if 'vs' in col.lower()]
-    query_q_vs = f"SELECT {', '.join(vs_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
-    cursor.execute(query_q_vs, (selected_mz,))
-    query_q_vs_result = cursor.fetchall()
-    # print("query_q_vs_result", query_q_vs_result)
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
+            all_columns = [desc[0] for desc in cursor.description]
+            vs_columns = [f'"{col}"' for col in all_columns if 'vs' in col.lower()]
+            query_q_vs = f"SELECT {', '.join(vs_columns)} FROM {table_name} WHERE mz = '{selected_mz}'"
+            cursor.execute(query_q_vs)
+            query_q_vs_result = cursor.fetchall()
+            # print("query_q_vs_result", query_q_vs_result)
 
-    for col in all_columns:
-        if 'vs' in col.lower():
-            col_vs.append(col)
-    # print(col_vs)
-    index = 0
-    vpos = 0.69
-    hpos = 0.7
-    for i in range(len(region_call)):
-        for j in range(i+1, len(region_call)):
-            vs_value_name = region_call[i]+"_vs_"+region_call[j]
-            vs_value_name_neg = region_call[j]+"_vs_"+region_call[i]
-            # print("vpos", vs_value_name, vs_value_name_neg)
+            for col in all_columns:
+                if 'vs' in col.lower():
+                    col_vs.append(col)
+            # print(col_vs)
+            index = 0
+            vpos = 0.69
+            hpos = 0.7
+            for i in range(len(region_call)):
+                for j in range(i+1, len(region_call)):
+                    vs_value_name = region_call[i]+"_vs_"+region_call[j]
+                    vs_value_name_neg = region_call[j]+"_vs_"+region_call[i]
+                    # print("vpos", vs_value_name, vs_value_name_neg)
 
-            if vs_value_name in col_vs:
-                vs_value = col_vs.index(vs_value_name)
-                # print(query_q_vs_result[0][vs_value])
-                qFdr = query_q_vs_result[0][vs_value]
-                # print("exist_", i)
+                    if vs_value_name in col_vs:
+                        vs_value = col_vs.index(vs_value_name)
+                        # print(query_q_vs_result[0][vs_value])
+                        qFdr = query_q_vs_result[0][vs_value]
+                        # print("exist_", i)
 
-                if qFdr <= 0.001:
-                    qFdrStars = '***'
-                    add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
-                                         vpos+index, hpos+index], symbol=qFdrStars, )
-                    index += 0.03
-                    # print("vpos", vpos+index, hpos+index)
-                elif qFdr <= 0.01 and qFdr > 0.001:
-                    qFdrStars = '**'
-                    add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
-                                         vpos+index, hpos+index], symbol=qFdrStars, )
-                    index += 0.03
-                    #
-                    # ("vpos", vpos+index, hpos+index)
+                        if qFdr <= 0.001:
+                            qFdrStars = '***'
+                            add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
+                                                vpos+index, hpos+index], symbol=qFdrStars, )
+                            index += 0.03
+                            # print("vpos", vpos+index, hpos+index)
+                        elif qFdr <= 0.01 and qFdr > 0.001:
+                            qFdrStars = '**'
+                            add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
+                                                vpos+index, hpos+index], symbol=qFdrStars, )
+                            index += 0.03
+                            #
+                            # ("vpos", vpos+index, hpos+index)
 
-                elif qFdr <= 0.05 and qFdr > 0.01:
-                    qFdrStars = '*'
-                    add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
-                                         vpos+index, hpos+index], symbol=qFdrStars, )
-                    index += 0.03
-                    # print("vpos", vpos+index, hpos+index)
+                        elif qFdr <= 0.05 and qFdr > 0.01:
+                            qFdrStars = '*'
+                            add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
+                                                vpos+index, hpos+index], symbol=qFdrStars, )
+                            index += 0.03
+                            # print("vpos", vpos+index, hpos+index)
 
-            elif vs_value_name_neg in col_vs:
-                vs_value = col_vs.index(vs_value_name_neg)
-                # print(query_q_vs_result[0][vs_value])
-                # print("exist_", i)
-                qFdr = query_q_vs_result[0][vs_value]
-                if qFdr <= 0.001:
-                    qFdrStars = '***'
-                    add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
-                                         vpos+index, hpos+index], symbol=qFdrStars)
-                    index += 0.03
-                    # print("vpos", vpos+index, hpos+index)
-                elif qFdr <= 0.01 and qFdr > 0.001:
-                    qFdrStars = '**'
-                    add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
-                                         vpos+index, hpos+index], symbol=qFdrStars)
-                    index += 0.03
-                    # print("vpos", vpos+index, hpos+index)
+                    elif vs_value_name_neg in col_vs:
+                        vs_value = col_vs.index(vs_value_name_neg)
+                        # print(query_q_vs_result[0][vs_value])
+                        # print("exist_", i)
+                        qFdr = query_q_vs_result[0][vs_value]
+                        if qFdr <= 0.001:
+                            qFdrStars = '***'
+                            add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
+                                                vpos+index, hpos+index], symbol=qFdrStars)
+                            index += 0.03
+                            # print("vpos", vpos+index, hpos+index)
+                        elif qFdr <= 0.01 and qFdr > 0.001:
+                            qFdrStars = '**'
+                            add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
+                                                vpos+index, hpos+index], symbol=qFdrStars)
+                            index += 0.03
+                            # print("vpos", vpos+index, hpos+index)
 
-                elif qFdr <= 0.05 and qFdr > 0.01:
-                    qFdrStars = '*'
-                    add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
-                                         vpos+index, hpos+index], symbol=qFdrStars)
-                    index += 0.03
-                    # print("vpos", vpos+index, hpos+index)
-    cursor.close()
-    connection.close()
+                        elif qFdr <= 0.05 and qFdr > 0.01:
+                            qFdrStars = '*'
+                            add_comparison_lines(fig, region_call, [region_call[i], region_call[j]], [
+                                                vpos+index, hpos+index], symbol=qFdrStars)
+                            index += 0.03
+                            # print("vpos", vpos+index, hpos+index)
+    except Exception as e:
+        logging.error(f"Error in vs_columnNames for table {table_name} and mz {selected_mz}: {e}")
 
 
 def add_comparison_lines(fig, region_call, regions, y_range, symbol):
@@ -1343,83 +1325,79 @@ def get_gmm_name_by_type(table_name, type_filter="all"):
         list: Sorted list of distinct metabolite values filtered by type.
     """
     try:
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        
-        # Check if table exists first
-        check_table_query = f"""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = %s
-        );
-        """
-        cursor.execute(check_table_query, (table_name,))
-        table_exists = cursor.fetchone()[0]
-        
-        if not table_exists:
-            logging.error(f"Table '{table_name}' does not exist")
-            return []
-        
-        # Check if Type column exists and has data
-        check_columns_query = f"""
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_name = %s AND column_name = 'Type'
-        """
-        cursor.execute(check_columns_query, (table_name,))
-        has_type_column = len(cursor.fetchall()) > 0
-        
-        if has_type_column and table_name == "in_vivo":
-            # Use Type column for in_vivo table
-            logging.info(f"Using Type column for filtering in table '{table_name}'")
+        with get_db_connection() as cursor:
+            # Check if table exists first
+            check_table_query = f"""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = %s
+            );
+            """
+            cursor.execute(check_table_query, (table_name,))
+            table_exists = cursor.fetchone()[0]
             
-            if type_filter == "all":
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites)
-            elif type_filter == "by_positive":
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites, ('by_positive',))
-            elif type_filter == "by_negative":
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites, ('by_negative',))
-            elif type_filter == "by_name":
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites, ('by_name',))
-            else:
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites)
+            if not table_exists:
+                logging.error(f"Table '{table_name}' does not exist")
+                return []
+            
+            # Check if Type column exists and has data
+            check_columns_query = f"""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'Type'
+            """
+            cursor.execute(check_columns_query, (table_name,))
+            has_type_column = len(cursor.fetchall()) > 0
+            
+            if has_type_column and table_name == "in_vivo":
+                # Use Type column for in_vivo table
+                logging.info(f"Using Type column for filtering in table '{table_name}'")
                 
-            metabolite_values = [row[0] for row in cursor.fetchall()]
-            
-        else:
-            # Use name column suffix parsing for gmm_test_1 table
-            logging.info(f"Using name column suffix parsing for table '{table_name}'")
-            
-            if type_filter == "all":
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites)
-            elif type_filter == "by_positive":
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites, ('%_POS%',))
-            elif type_filter == "by_negative":
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites, ('%_NEG%',))
-            elif type_filter == "by_name":
-                # For gmm_test_1, "by_name" means metabolites without _POS or _NEG suffixes
-                # But since all records have _POS, this will return empty for gmm_test_1
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" NOT LIKE %s AND "name" NOT LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites, ('%_POS%', '%_NEG%'))
-            else:
-                # Default to all if unknown filter
-                query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
-                cursor.execute(query_metabolites)
+                if type_filter == "all":
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites)
+                elif type_filter == "by_positive":
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites, ('by_positive',))
+                elif type_filter == "by_negative":
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites, ('by_negative',))
+                elif type_filter == "by_name":
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "Type" = %s AND "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites, ('by_name',))
+                else:
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites)
+                    
+                metabolite_values = [row[0] for row in cursor.fetchall()]
                 
-            metabolite_values = [row[0] for row in cursor.fetchall()]
-        
-        cursor.close()
-        connection.close()
-        
-        logging.info(f"Retrieved {len(metabolite_values)} metabolites for type '{type_filter}' from table '{table_name}'")
-        return metabolite_values
+            else:
+                # Use name column suffix parsing for gmm_test_1 table
+                logging.info(f"Using name column suffix parsing for table '{table_name}'")
+                
+                if type_filter == "all":
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites)
+                elif type_filter == "by_positive":
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites, ('%_POS%',))
+                elif type_filter == "by_negative":
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites, ('%_NEG%',))
+                elif type_filter == "by_name":
+                    # For gmm_test_1, "by_name" means metabolites without _POS or _NEG suffixes
+                    # But since all records have _POS, this will return empty for gmm_test_1
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" NOT LIKE %s AND "name" NOT LIKE %s AND "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites, ('%_POS%', '%_NEG%'))
+                else:
+                    # Default to all if unknown filter
+                    query_metabolites = f'SELECT DISTINCT "name" FROM "{table_name}" WHERE "name" IS NOT NULL ORDER BY "name"'
+                    cursor.execute(query_metabolites)
+                    
+                metabolite_values = [row[0] for row in cursor.fetchall()]
+            
+            
+            logging.info(f"Retrieved {len(metabolite_values)} metabolites for type '{type_filter}' from table '{table_name}'")
+            return metabolite_values
         
     except Exception as e:
         logging.error(f"Error getting metabolites by type from table '{table_name}': {e}")
@@ -1438,73 +1416,136 @@ def debug_table_structure(table_name):
         dict: Information about table structure and sample data.
     """
     try:
-        connection = psycopg2.connect(db_url)
-        cursor = connection.cursor()
-        
-        # Check if table exists
-        check_table_query = f"""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = %s
-        );
-        """
-        cursor.execute(check_table_query, (table_name,))
-        table_exists = cursor.fetchone()[0]
-        
-        if not table_exists:
-            return {"error": f"Table '{table_name}' does not exist"}
-        
-        # Get table info
-        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-        row_count = cursor.fetchone()[0]
-        
-        # Get column info
-        cursor.execute(f"""
-            SELECT column_name, data_type 
-            FROM information_schema.columns 
-            WHERE table_name = %s 
-            ORDER BY ordinal_position
-        """, (table_name,))
-        columns_info = cursor.fetchall()
-        
-        # Get sample data
-        cursor.execute(f"SELECT * FROM {table_name} LIMIT 3")
-        sample_data = cursor.fetchall()
-        column_names = [desc[0] for desc in cursor.description]
-        
-        # Get distinct metabolite count
-        cursor.execute(f'SELECT COUNT(DISTINCT "name") FROM {table_name}')
-        unique_metabolites = cursor.fetchone()[0]
-        
-        # Get bacteria columns (numeric columns excluding metadata)
-        cursor.execute(f"""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = %s 
-            AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
-            AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'metabolite')
-        """, (table_name,))
-        bacteria_columns = [row[0] for row in cursor.fetchall()]
-        
-        return {
-            "table_name": table_name,
-            "exists": table_exists,
-            "total_rows": row_count,
-            "unique_metabolites": unique_metabolites,
-            "total_columns": len(columns_info),
-            "bacteria_columns_count": len(bacteria_columns),
-            "bacteria_columns": bacteria_columns[:10],  # First 10 bacteria columns
-            "column_info": columns_info,
-            "sample_data": {
-                "columns": column_names,
-                "rows": sample_data
+        with get_db_connection() as cursor:
+            # Check if table exists
+            check_table_query = f"""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = %s
+            );
+            """
+            cursor.execute(check_table_query, (table_name,))
+            table_exists = cursor.fetchone()[0]
+            
+            if not table_exists:
+                return {"error": f"Table '{table_name}' does not exist"}
+            
+            # Get table info
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            row_count = cursor.fetchone()[0]
+            
+            # Get column info
+            cursor.execute(f"""
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                ORDER BY ordinal_position
+            """, (table_name,))
+            columns_info = cursor.fetchall()
+            
+            # Get sample data
+            cursor.execute(f"SELECT * FROM {table_name} LIMIT 3")
+            sample_data = cursor.fetchall()
+            column_names = [desc[0] for desc in cursor.description]
+            
+            # Get distinct metabolite count
+            cursor.execute(f'SELECT COUNT(DISTINCT "name") FROM {table_name}')
+            unique_metabolites = cursor.fetchone()[0]
+            
+            # Get bacteria columns (numeric columns excluding metadata)
+            cursor.execute(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
+                AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'metabolite')
+            """, (table_name,))
+            bacteria_columns = [row[0] for row in cursor.fetchall()]
+            
+            return {
+                "table_name": table_name,
+                "exists": table_exists,
+                "total_rows": row_count,
+                "unique_metabolites": unique_metabolites,
+                "total_columns": len(columns_info),
+                "bacteria_columns_count": len(bacteria_columns),
+                "bacteria_columns": bacteria_columns[:10],  # First 10 bacteria columns
+                "column_info": columns_info,
+                "sample_data": {
+                    "columns": column_names,
+                    "rows": sample_data
+                }
             }
-        }
         
     except Exception as e:
         return {"error": f"Error inspecting table '{table_name}': {str(e)}"}
-    finally:
-        if 'cursor' in locals() and cursor:
-            cursor.close()
-        if 'connection' in locals() and connection:
-            connection.close()
+
+
+@simple_cache(max_size=50, ttl=600)
+def get_heatmap_data(table_name: str, metabolites: List[str], bacteria: List[str]) -> Optional[pd.DataFrame]:
+    """
+    Fetches and processes data specifically for heatmap generation, optimized for performance.
+    
+    Args:
+        table_name (str): The name of the database table.
+        metabolites (List[str]): A list of metabolite names to include (rows).
+        bacteria (List[str]): A list of bacteria column names to include (columns).
+        
+    Returns:
+        pd.DataFrame: A transposed DataFrame ready for plotting, or None if no data.
+    """
+    if not metabolites or not bacteria:
+        logging.warning("Heatmap data fetch requires both metabolites and bacteria.")
+        return None
+
+    try:
+        with get_db_connection() as cursor:
+            # Sanitize column names to prevent SQL injection.
+            safe_bacteria_cols = [f'"{col}"' for col in bacteria if col.replace('_', '').isalnum()]
+            
+            if not safe_bacteria_cols:
+                logging.error("No valid bacteria columns provided.")
+                return None
+
+            # Create the part of the query for "Net Balance"
+            net_balance_sql = " + ".join([f"COALESCE({col}, 0)" for col in safe_bacteria_cols])
+
+            # Construct the main query
+            query = f"""
+            SELECT 
+                name,
+                {', '.join(safe_bacteria_cols)},
+                ({net_balance_sql}) AS "Net Balance"
+            FROM {table_name}
+            WHERE name = ANY(%s)
+            """
+            
+            logging.info(f"Executing optimized heatmap query on {table_name}.")
+            
+            # Use psycopg2's list adaptation for the IN clause
+            cursor.execute(query, (metabolites,))
+            
+            data = cursor.fetchall()
+            
+            if not data:
+                logging.warning(f"No data returned from heatmap query for table {table_name}.")
+                return None
+                
+            columns = [desc[0] for desc in cursor.description]
+            df = pd.DataFrame(data, columns=columns)
+            
+            # Set index and transpose for heatmap
+            df_processed = df.set_index("name").T
+            
+            # Ensure "Net Balance" is the first row
+            if "Net Balance" in df_processed.index:
+                net_balance_row = df_processed.loc[["Net Balance"]]
+                other_rows = df_processed.drop("Net Balance")
+                df_processed = pd.concat([net_balance_row, other_rows])
+
+            logging.info(f"Successfully processed heatmap data for {table_name}. Shape: {df_processed.shape}")
+            return df_processed
+            
+    except Exception as e:
+        logging.error(f"Error in get_heatmap_data for table {table_name}: {e}")
+        return None
