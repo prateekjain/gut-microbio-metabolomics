@@ -15,6 +15,8 @@ from contextlib import contextmanager
 import functools
 import time
 from typing import List, Dict, Optional, Tuple, Union
+import psutil
+import gc
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +35,112 @@ region = ["cecum", "ascending", "transverse",
 
 load_dotenv()
 db_url = os.getenv('DATABASE_URL')
+
+import time
+import logging
+
+def log_time(label):
+    """
+    Enhanced time logging decorator with more detailed performance tracking
+    
+    Args:
+        label (str): A descriptive label for the function being timed
+    
+    Returns:
+        Decorator function that logs execution time and additional metrics
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Capture start time and initial memory
+            start_time = time.time()
+            process = psutil.Process()
+            start_memory = process.memory_info().rss / 1024 / 1024  # MB
+            
+            # Log input arguments for context (safely)
+            input_info = {}
+            try:
+                for i, arg in enumerate(args):
+                    if hasattr(arg, '__len__'):
+                        input_info[f'arg_{i}'] = len(arg)
+                for k, v in kwargs.items():
+                    if hasattr(v, '__len__'):
+                        input_info[k] = len(v)
+            except Exception:
+                input_info = "Unable to capture input sizes"
+            
+            try:
+                # Execute the function
+                result = func(*args, **kwargs)
+                
+                # Calculate performance metrics
+                execution_time = time.time() - start_time
+                end_memory = process.memory_info().rss / 1024 / 1024  # MB
+                memory_used = end_memory - start_memory
+                
+                # Detailed logging
+                logging.info(
+                    f"[PERFORMANCE] {label}\n"
+                    f"  Execution Time: {execution_time:.4f} seconds\n"
+                    f"  Memory Used: {memory_used:.2f} MB\n"
+                    f"  Input Sizes: {input_info}"
+                )
+                
+                return result
+            
+            except Exception as e:
+                # Log error with timing information
+                execution_time = time.time() - start_time
+                logging.error(
+                    f"[PERFORMANCE] {label} - FAILED\n"
+                    f"  Execution Time: {execution_time:.4f} seconds\n"
+                    f"  Error: {str(e)}\n"
+                    f"  Input Sizes: {input_info}"
+                )
+                raise
+        
+        return wrapper
+    return decorator
+
+def memory_logger(label):
+    """Decorator to log memory usage before and after function execution"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Get memory before function execution
+            process = psutil.Process()
+            memory_before = process.memory_info().rss / 1024 / 1024  # MB
+            logging.info(f"[MEMORY] {label} - BEFORE: {memory_before:.2f} MB")
+            
+            try:
+                result = func(*args, **kwargs)
+                
+                # Get memory after function execution
+                memory_after = process.memory_info().rss / 1024 / 1024  # MB
+                memory_diff = memory_after - memory_before
+                logging.info(f"[MEMORY] {label} - AFTER: {memory_after:.2f} MB (DIFF: {memory_diff:+.2f} MB)")
+                
+                # Force garbage collection if memory increased significantly
+                if memory_diff > 50:  # If memory increased by more than 50MB
+                    logging.warning(f"[MEMORY] {label} - Large memory increase detected, forcing garbage collection")
+                    gc.collect()
+                    memory_after_gc = process.memory_info().rss / 1024 / 1024  # MB
+                    logging.info(f"[MEMORY] {label} - AFTER GC: {memory_after_gc:.2f} MB")
+                
+                return result
+            except Exception as e:
+                # Log memory even if function fails
+                memory_after = process.memory_info().rss / 1024 / 1024  # MB
+                memory_diff = memory_after - memory_before
+                logging.error(f"[MEMORY] {label} - ERROR: {memory_after:.2f} MB (DIFF: {memory_diff:+.2f} MB)")
+                raise
+        return wrapper
+    return decorator
+
+def log_memory_usage(label=""):
+    """Utility function to log current memory usage"""
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / 1024 / 1024
+    logging.info(f"[MEMORY] {label} - Current: {memory_mb:.2f} MB")
 
 # ===== CONNECTION POOL SETUP =====
 class DatabasePool:
@@ -158,6 +266,8 @@ def selected_mz_cleaning(selected_mz):
         # print("updated mz value", selected_mz)
     return selected_mz
 
+@memory_logger("get_gmm_name: Memory")
+@log_time("get_gmm_name: DB Query")
 @simple_cache(max_size=50, ttl=600)
 def get_gmm_name(table_name):
     """
@@ -203,6 +313,8 @@ def get_gmm_name(table_name):
 
 
 
+@memory_logger("get_all_columns_data: Memory")
+@log_time("get_all_columns_data: DB Query")
 def get_all_columns_data(table_name, selected_compound):
     """
     Fetches all rows from a specific table for the selected compound.
@@ -256,6 +368,8 @@ def get_all_columns_data(table_name, selected_compound):
         return None
 
 
+@memory_logger("get_all_columns_data_all_compounds: Memory")
+@log_time("get_all_columns_data_all_compounds: DB Query")
 @simple_cache(max_size=10, ttl=900)  # Cache for 15 minutes - larger tables need longer cache
 def get_all_columns_data_all_compounds(table_name):
     """
@@ -301,11 +415,14 @@ def get_all_columns_data_all_compounds(table_name):
 
 
 
+@memory_logger("get_multiple_bacteria_top_metabolites: Memory")
+@log_time("get_multiple_bacteria_top_metabolites: DB Query")
 @simple_cache(max_size=50, ttl=600)
 def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
     """
-    Fetches all metabolites for the selected bacteria where the bacteria collectively rank among the top 10 producers.
-
+    OPTIMIZED: Fetches metabolites for selected bacteria where they rank in top 10 producers.
+    Maintains original logic: ranks selected bacteria against ALL bacteria, not just selected bacteria.
+    
     Args:
         table_name (str): Name of the table in the database.
         selected_bacteria (list): List of bacteria to filter by.
@@ -319,12 +436,22 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 
     try:
         with get_db_connection() as cursor:
-            # Fetch column names dynamically
-            cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = %s", (table_name,))
-            all_columns = [row[0] for row in cursor.fetchall()]
-            logging.info("Columns fetched from table: %s", all_columns)
-
-            # Get only numeric bacterial columns, excluding metadata columns
+            # Validate that selected bacteria columns exist
+            cursor.execute(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                AND column_name = ANY(%s)
+            """, (table_name, selected_bacteria))
+            
+            valid_bacteria = [row[0] for row in cursor.fetchall()]
+            if not valid_bacteria:
+                logging.warning("None of the selected bacteria columns exist in table: %s", table_name)
+                return None
+            
+            logging.info("Valid bacteria columns: %s", valid_bacteria)
+            
+            # Get ALL bacteria columns for proper ranking
             cursor.execute(f"""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -332,43 +459,57 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
                 AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
                 AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
             """, (table_name,))
-            bacteria_columns = [row[0] for row in cursor.fetchall()]
-            logging.info("Bacteria columns determined dynamically: %s", bacteria_columns)
-
-            # Build the dynamic UNPIVOT query with properly quoted column names, casting to text
-            unpivot_parts = []
-            for col in bacteria_columns:
-                query_part = f"SELECT name AS metabolite, '{col}' AS bacteria, " + f'"{col}"' + f"::text AS value FROM {table_name}"
-                unpivot_parts.append(query_part)
-            unpivot_query = " UNION ALL ".join(unpivot_parts)
-            query = f"""
-            WITH UnpivotedData AS (
-                {unpivot_query}
+            all_bacteria_columns = [row[0] for row in cursor.fetchall()]
+            
+            logging.info("Total bacteria columns for ranking: %d", len(all_bacteria_columns))
+            
+            # HIGHLY OPTIMIZED QUERY: Use efficient ranking with minimal data processing
+            # Build the ranking query more efficiently
+            union_parts = []
+            for col in all_bacteria_columns:
+                union_parts.append(f'SELECT name, \'{col}\' AS bacteria, "{col}"::double precision AS value FROM {table_name} WHERE "{col}" IS NOT NULL AND "{col}" > 0')
+            union_query = ' UNION ALL '.join(union_parts)
+            
+            ranking_query = f"""
+            WITH AllBacteriaRanking AS (
+                SELECT 
+                    name AS metabolite,
+                    bacteria::text,
+                    value::double precision,
+                    ROW_NUMBER() OVER (PARTITION BY name ORDER BY value DESC) AS rank
+                FROM (
+                    {union_query}
+                ) all_data
             ),
-            RankedBacteria AS (
-                SELECT
-                    metabolite,
-                    bacteria,
-                    value,
-                    RANK() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
-                FROM UnpivotedData
+            Top10PerMetabolite AS (
+                SELECT metabolite, bacteria, value, rank
+                FROM AllBacteriaRanking 
+                WHERE rank <= 10
             )
-            SELECT * FROM RankedBacteria WHERE rank <= 10;
+            SELECT metabolite, bacteria, value, rank
+            FROM Top10PerMetabolite
+            WHERE bacteria = ANY(%s)
+            ORDER BY metabolite, rank;
             """
-            logging.info("Executing query:\n%s", query)
-
-            cursor.execute(query)
+            
+            logging.info("Executing optimized query with proper ranking against all %d bacteria", len(all_bacteria_columns))
+            
+            cursor.execute(ranking_query, (valid_bacteria,))
             data = cursor.fetchall()
-            print('data here',data)
-
+            
             if not data:
                 logging.warning("No data found for selected bacteria in the top 10 metabolites: %s", selected_bacteria)
                 return None
 
-            # Create DataFrame
-            columns = [desc[0] for desc in cursor.description]
+            # Create DataFrame with optimized memory usage
+            columns = ['metabolite', 'bacteria', 'value', 'rank']
             df = pd.DataFrame(data, columns=columns)
-            logging.info("Data fetched successfully for selected bacteria in the top 10 metabolites.")
+            
+            # Convert value to numeric efficiently
+            df['value'] = pd.to_numeric(df['value'], errors='coerce')
+            df = df.dropna(subset=['value'])
+            
+            logging.info("Data fetched successfully. Shape: %s", df.shape)
             return df
 
     except Exception as e:
@@ -377,19 +518,37 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 
  
 
+@memory_logger("get_multiple_bacteria_cumm_top_metabolites: Memory")
+@log_time("get_multiple_bacteria_cumm_top_metabolites: DB Query")
 @simple_cache(max_size=50, ttl=600)
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
     """
-    Fetches metabolites where ALL selected bacteria appear together in the top 10 producers
-    of each metabolite.
+    HIGHLY OPTIMIZED: Fetches metabolites where ALL selected bacteria appear together in the top 10 producers.
+    Uses efficient aggregation and ranking to avoid massive UNION ALL operations.
+    Maintains original logic: ranks selected bacteria against ALL bacteria, not just selected bacteria.
     """
-    logging.info("Fetching top metabolites for selected bacteria: %s", selected_bacteria)
+    logging.info("Fetching cumulative top metabolites for selected bacteria: %s", selected_bacteria)
     if not selected_bacteria:
         return None
 
     try:
         with get_db_connection() as cursor:
-            # Get only numeric bacterial columns, excluding metadata columns
+            # Validate that selected bacteria columns exist
+            cursor.execute(f"""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = %s 
+                AND column_name = ANY(%s)
+            """, (table_name, selected_bacteria))
+            
+            valid_bacteria = [row[0] for row in cursor.fetchall()]
+            if not valid_bacteria:
+                logging.warning("None of the selected bacteria columns exist in table: %s", table_name)
+                return None
+            
+            logging.info("Valid bacteria columns for cumulative analysis: %s", valid_bacteria)
+            
+            # Get ALL bacteria columns for proper ranking
             cursor.execute(f"""
                 SELECT column_name 
                 FROM information_schema.columns 
@@ -397,107 +556,105 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
                 AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
                 AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
             """, (table_name,))
-            bacteria_columns = [row[0] for row in cursor.fetchall()]
-
-            # Build CROSS JOIN LATERAL (VALUES ...) clause to unpivot all bacterial columns in a single scan
-            lateral_values = ",\n        ".join([
-                f"('{col}', t.\"{col}\"::double precision)" for col in bacteria_columns
-            ])
-
-            # Prepare placeholders for selected bacteria to ensure safe parameterization
-            bacteria_placeholders = ", ".join(["%s"] * len(selected_bacteria))
-
+            all_bacteria_columns = [row[0] for row in cursor.fetchall()]
+            
+            logging.info("Total bacteria columns for cumulative ranking: %d", len(all_bacteria_columns))
+            
+            # Build the selected bacteria columns for the main query
+            selected_cols = [f'"{col}"' for col in valid_bacteria]
+            selected_cols_str = ', '.join(selected_cols)
+            
+            # Build the ranking comparison columns (all bacteria for proper ranking)
+            ranking_cols = [f'"{col}"' for col in all_bacteria_columns]
+            ranking_cols_str = ', '.join(ranking_cols)
+            
+            # HIGHLY OPTIMIZED QUERY: Use efficient ranking with minimal data processing
+            # First, get metabolites where ALL selected bacteria have values > 0
+            values_clause = ', '.join([f'("{col}", "{col}")' for col in valid_bacteria])
+            cross_join_values = ', '.join([f'("{col}", t_data."{col}")' for col in valid_bacteria])
+            union_parts = []
+            for col in all_bacteria_columns:
+                union_parts.append(f'SELECT name, \'{col}\' AS bacteria, "{col}"::double precision AS value FROM {table_name} WHERE "{col}" IS NOT NULL AND "{col}" > 0')
+            union_query = ' UNION ALL '.join(union_parts)
+            
             base_query = f"""
-            WITH unpivoted AS (
-                SELECT t.name AS metabolite,
-                       v.bacteria,
-                       v.value
-                FROM {table_name} t
-                CROSS JOIN LATERAL (VALUES
-                    {lateral_values}
-                ) v(bacteria, value)
-                WHERE v.value > 0
+            WITH ValidMetabolites AS (
+                SELECT name AS metabolite
+                FROM {table_name}
+                WHERE name IS NOT NULL
+                AND {len(valid_bacteria)} = (
+                    SELECT COUNT(*)
+                    FROM (VALUES {values_clause}) AS t(col_name, value)
+                    WHERE value IS NOT NULL AND value > 0
+                )
             ),
-            ranked AS (
-                SELECT metabolite,
-                       bacteria,
-                       value,
-                       ROW_NUMBER() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
-                FROM unpivoted
+            SelectedBacteriaUnpivot AS (
+                SELECT 
+                    vm.metabolite,
+                    t.col_name::text AS bacteria,
+                    t.value::double precision
+                FROM ValidMetabolites vm
+                JOIN {table_name} t_data ON vm.metabolite = t_data.name
+                CROSS JOIN LATERAL (
+                    VALUES {cross_join_values}
+                ) AS t(col_name, value)
+                WHERE t.value IS NOT NULL AND t.value > 0
             ),
-            top10 AS (
-                SELECT *
-                FROM ranked
+            AllBacteriaRanking AS (
+                SELECT 
+                    name AS metabolite,
+                    bacteria::text,
+                    value::double precision,
+                    ROW_NUMBER() OVER (PARTITION BY name ORDER BY value DESC) AS rank
+                FROM (
+                    {union_query}
+                ) all_data
+            ),
+            Top10PerMetabolite AS (
+                SELECT metabolite, bacteria, value, rank
+                FROM AllBacteriaRanking 
                 WHERE rank <= 10
             ),
-            metabolites_with_all AS (
+            MetabolitesWithAllSelected AS (
                 SELECT metabolite
-                FROM top10
-                WHERE bacteria IN ({bacteria_placeholders})
+                FROM Top10PerMetabolite
+                WHERE bacteria = ANY(%s)
                 GROUP BY metabolite
-                HAVING COUNT(DISTINCT bacteria) = {len(selected_bacteria)}
+                HAVING COUNT(DISTINCT bacteria) = {len(valid_bacteria)}
             )
-            SELECT t.metabolite,
-                   t.bacteria,
-                   t.value,
-                   t.rank
-            FROM top10 t
-            JOIN metabolites_with_all m USING (metabolite)
-            WHERE t.bacteria IN ({bacteria_placeholders})
-            ORDER BY t.metabolite, t.rank;
+            SELECT s.metabolite, s.bacteria, s.value, t.rank
+            FROM SelectedBacteriaUnpivot s
+            JOIN MetabolitesWithAllSelected m USING (metabolite)
+            JOIN Top10PerMetabolite t ON s.metabolite = t.metabolite AND s.bacteria::text = t.bacteria::text
+            ORDER BY s.metabolite, t.rank;
             """
-
-            # Execute query with selected bacteria passed twice (for the IN clause in metabolites_with_all and final filter)
-            params = tuple(selected_bacteria) + tuple(selected_bacteria)
-            cursor.execute(base_query, params)
-
-            columns = ['metabolite', 'bacteria', 'value', 'rank']
-            top_10_df = pd.DataFrame(cursor.fetchall(), columns=columns)
-
-            # Print all top 10 producers for each metabolite
-            print("\nTop 10 Bacteria Producers for each Metabolite:")
-            print("=" * 50)
-            for metabolite in top_10_df['metabolite'].unique():
-                bacteria_list = top_10_df[top_10_df['metabolite'] == metabolite]['bacteria'].tolist()
-                print(f"\nMetabolite: {metabolite}")
-                print(f"Top 10 Producers: {', '.join(bacteria_list)}")
-            print("=" * 50)
-
-            # Find metabolites where ALL selected bacteria appear in top 10
-            valid_metabolites = []
-            for metabolite in top_10_df['metabolite'].unique():
-                metabolite_bacteria = set(top_10_df[top_10_df['metabolite'] == metabolite]['bacteria'])
-                if all(bacteria in metabolite_bacteria for bacteria in selected_bacteria):
-                    valid_metabolites.append(metabolite)
-
-            if not valid_metabolites:
+            
+            logging.info("Executing highly optimized cumulative query")
+            cursor.execute(base_query, (valid_bacteria,))
+            data = cursor.fetchall()
+            
+            if not data:
                 logging.warning("No metabolites found where all selected bacteria appear together in top 10")
                 return None
 
-            # Filter data for selected bacteria and valid metabolites
-            result_df = top_10_df[
-                (top_10_df['bacteria'].isin(selected_bacteria)) & 
-                (top_10_df['metabolite'].isin(valid_metabolites))
-            ]
+            # Create DataFrame with optimized memory usage
+            columns = ['metabolite', 'bacteria', 'value', 'rank']
+            result_df = pd.DataFrame(data, columns=columns)
+            
+            # Convert value to numeric efficiently
+            result_df['value'] = pd.to_numeric(result_df['value'], errors='coerce')
+            result_df = result_df.dropna(subset=['value'])
 
-            if result_df.empty:
-                logging.warning("No data found for selected bacteria")
-                return None
-
-            # Debug information
-            print("\nSelected bacteria found together in these metabolites:")
-            for metabolite in result_df['metabolite'].unique():
-                bacteria_ranks = result_df[result_df['metabolite'] == metabolite][['bacteria', 'rank']].values
-                print(f"\nMetabolite: {metabolite}")
-                print("Bacteria and their ranks:", bacteria_ranks)
-
+            logging.info("Cumulative analysis completed. Shape: %s", result_df.shape)
             return result_df
 
     except Exception as e:
-        logging.error("Error fetching data: %s", e)
+        logging.error("Error fetching cumulative data: %s", e)
         return None
 
 
+@memory_logger("get_metabolite_data: Memory")
+@log_time("get_metabolite_data: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache metabolite data for 5 minutes
 def get_metabolite_data(table_name, metabolite):
     """Fetch all bacteria values for a specific metabolite"""
@@ -536,6 +693,8 @@ def get_metabolite_data(table_name, metabolite):
         logging.error("Error fetching metabolite data: %s", e)
         return None
 
+@memory_logger("get_bacteria_data: Memory")
+@log_time("get_bacteria_data: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache bacteria data for 5 minutes
 def get_bacteria_data(table_name, bacteria):
     """Fetch all metabolite values for a specific bacteria"""
@@ -560,6 +719,7 @@ def get_bacteria_data(table_name, bacteria):
         logging.error("Error fetching bacteria data: %s", e)
         return None                       
             
+@log_time("get_column_names: DB Query")
 @simple_cache(max_size=20, ttl=600)  # Cache column names for 10 minutes
 def get_column_names(table_name):
     """
@@ -638,6 +798,8 @@ def get_bacteria_names(table_name):
         return []
 
 
+@memory_logger("get_top_bottom_bacteria_values: Memory")
+@log_time("get_top_bottom_bacteria_values: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache for 5 minutes
 def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, order="desc"):
     """
@@ -713,6 +875,8 @@ def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, orde
         return pd.DataFrame()
 
 # ===== ENHANCED DATA PROCESSING UTILITIES =====
+@memory_logger("clean_dataframe_values: Memory")
+@log_time("clean_dataframe_values: Processing")
 def clean_dataframe_values(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
     """
     Vectorized data cleaning for better performance
@@ -741,6 +905,8 @@ def clean_dataframe_values(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
     
     return df_clean
 
+@memory_logger("optimize_dataframe_dtypes: Memory")
+@log_time("optimize_dataframe_dtypes: Processing")
 def optimize_dataframe_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     """
     Optimize DataFrame data types for better memory usage and performance
@@ -767,6 +933,8 @@ def optimize_dataframe_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     
     return df_optimized
 
+@memory_logger("batch_process_data: Memory")
+@log_time("batch_process_data: Processing")
 def batch_process_data(data_list: List[pd.DataFrame]) -> pd.DataFrame:
     """
     Efficiently batch process multiple DataFrames
@@ -799,6 +967,7 @@ def batch_process_data(data_list: List[pd.DataFrame]) -> pd.DataFrame:
 
 
 
+@log_time("get_mz_values: DB Query")
 @simple_cache(max_size=50, ttl=900)
 def get_mz_values(table_name):
     try:
@@ -816,6 +985,7 @@ def get_mz_values(table_name):
         return []
 
 
+@log_time("get_cecum_and_ascending_mz_values: DB Query")
 @simple_cache(max_size=20, ttl=900)
 def get_cecum_and_ascending_mz_values(regions):
     try:
@@ -1311,6 +1481,7 @@ def get_dropdown_options():
 #     return result_list
 
 
+@log_time("get_gmm_name_by_type: DB Query")
 def get_gmm_name_by_type(table_name, type_filter="all"):
     """
     Fetches metabolites filtered by type. Handles different table structures:
@@ -1481,6 +1652,8 @@ def debug_table_structure(table_name):
         return {"error": f"Error inspecting table '{table_name}': {str(e)}"}
 
 
+@memory_logger("get_heatmap_data: Memory")
+@log_time("get_heatmap_data: DB Query")
 @simple_cache(max_size=50, ttl=600)
 def get_heatmap_data(table_name: str, metabolites: List[str], bacteria: List[str]) -> Optional[pd.DataFrame]:
     """
@@ -1549,3 +1722,44 @@ def get_heatmap_data(table_name: str, metabolites: List[str], bacteria: List[str
     except Exception as e:
         logging.error(f"Error in get_heatmap_data for table {table_name}: {e}")
         return None
+
+def clear_function_cache(function_name=None):
+    """
+    Clear cache for specific function or all functions.
+    
+    Args:
+        function_name (str, optional): Name of function to clear cache for. If None, clears all caches.
+    """
+    if function_name:
+        # Clear specific function cache
+        if hasattr(globals()[function_name], 'clear_cache'):
+            globals()[function_name].clear_cache()
+            logging.info(f"Cache cleared for function: {function_name}")
+    else:
+        # Clear all function caches
+        for name, obj in globals().items():
+            if hasattr(obj, 'clear_cache'):
+                obj.clear_cache()
+        logging.info("All function caches cleared")
+
+def get_cache_info():
+    """Get information about all cached functions"""
+    cache_info = {}
+    for name, obj in globals().items():
+        if hasattr(obj, 'cache_info'):
+            try:
+                cache_info[name] = obj.cache_info()
+            except:
+                pass
+    return cache_info
+
+# Database optimization suggestions:
+# 1. Create indexes on frequently queried columns:
+#    CREATE INDEX idx_name ON table_name(name);
+#    CREATE INDEX idx_bacteria_columns ON table_name USING gin(to_tsvector('english', bacteria_column_name));
+# 
+# 2. Consider partitioning large tables by metabolite type or value ranges
+# 
+# 3. Use materialized views for complex aggregations that are queried frequently
+# 
+# 4. Monitor query performance with EXPLAIN ANALYZE

@@ -4,16 +4,58 @@ import pandas as pd
 import numpy as np
 import logging
 from typing import List, Dict, Optional, Tuple, Union
-from compare_tumor.data_functions import vs_columnNames
+from compare_tumor.data_functions import log_time, vs_columnNames
 from compare_tumor.constant import region_colors
 import functools
 import time
+import psutil
+import gc
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 region = ["cecum", "ascending", "transverse",
           "descending", "sigmoid", "rectosigmoid", "rectum"]
+
+def memory_logger(label):
+    """Decorator to log memory usage before and after function execution"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Get memory before function execution
+            process = psutil.Process()
+            memory_before = process.memory_info().rss / 1024 / 1024  # MB
+            logger.info(f"[MEMORY] {label} - BEFORE: {memory_before:.2f} MB")
+            
+            try:
+                result = func(*args, **kwargs)
+                
+                # Get memory after function execution
+                memory_after = process.memory_info().rss / 1024 / 1024  # MB
+                memory_diff = memory_after - memory_before
+                logger.info(f"[MEMORY] {label} - AFTER: {memory_after:.2f} MB (DIFF: {memory_diff:+.2f} MB)")
+                
+                # Force garbage collection if memory increased significantly
+                if memory_diff > 50:  # If memory increased by more than 50MB
+                    logger.warning(f"[MEMORY] {label} - Large memory increase detected, forcing garbage collection")
+                    gc.collect()
+                    memory_after_gc = process.memory_info().rss / 1024 / 1024  # MB
+                    logger.info(f"[MEMORY] {label} - AFTER GC: {memory_after_gc:.2f} MB")
+                
+                return result
+            except Exception as e:
+                # Log memory even if function fails
+                memory_after = process.memory_info().rss / 1024 / 1024  # MB
+                memory_diff = memory_after - memory_before
+                logger.error(f"[MEMORY] {label} - ERROR: {memory_after:.2f} MB (DIFF: {memory_diff:+.2f} MB)")
+                raise
+        return wrapper
+    return decorator
+
+def log_memory_usage(label=""):
+    """Utility function to log current memory usage"""
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / 1024 / 1024
+    logger.info(f"[MEMORY] {label} - Current: {memory_mb:.2f} MB")
 
 # ===== ENHANCED PLOTTING CONFIGURATION =====
 class PlotConfig:
@@ -65,18 +107,47 @@ class PlotConfig:
 
 # ===== PERFORMANCE DECORATORS =====
 def plot_performance_logger(func):
-    """Log plot generation performance"""
+    """Enhanced performance logger for plotting functions"""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
+        start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+        
         try:
+            # Log input data sizes for context
+            input_sizes = {
+                k: (len(v) if hasattr(v, '__len__') else 'N/A') 
+                for k, v in kwargs.items() 
+                if isinstance(v, (list, np.ndarray, pd.DataFrame))
+            }
+            
+            logger.info(f"Plotting {func.__name__} - Input sizes: {input_sizes}")
+            
+            # Execute the function
             result = func(*args, **kwargs)
+            
+            # Calculate performance metrics
             execution_time = time.time() - start_time
-            logger.debug(f"Plot {func.__name__} generated in {execution_time:.3f} seconds")
+            end_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+            memory_used = end_memory - start_memory
+            
+            # Detailed performance logging
+            logger.info(
+                f"Plot Performance: {func.__name__}\n"
+                f"  Execution Time: {execution_time:.4f} seconds\n"
+                f"  Memory Used: {memory_used:.2f} MB\n"
+                f"  Input Sizes: {input_sizes}"
+            )
+            
             return result
+        
         except Exception as e:
             execution_time = time.time() - start_time
-            logger.error(f"Plot {func.__name__} failed after {execution_time:.3f} seconds: {e}")
+            logger.error(
+                f"Plot {func.__name__} failed\n"
+                f"  Execution Time: {execution_time:.4f} seconds\n"
+                f"  Error: {str(e)}"
+            )
             raise
     return wrapper
 
@@ -143,6 +214,8 @@ def get_dynamic_plot_size(data_length: int, base_width: int = 300, base_height: 
     return width, height
 
 # ===== ENHANCED PLOTTING FUNCTIONS =====
+@memory_logger("create_tumor_vs_normal_plot: Memory")
+@log_time("create_tumor_vs_normal_plot: Plotting")
 @plot_performance_logger
 @validate_data
 def create_tumor_vs_normal_plot(
@@ -239,6 +312,8 @@ def create_tumor_vs_normal_plot(
     
     return fig
 
+@memory_logger("create_multi_region_plot: Memory")
+@log_time("create_multi_region_plot: Plotting")
 @plot_performance_logger
 @validate_data
 def create_multi_region_plot(
@@ -319,6 +394,8 @@ def create_multi_region_plot(
     
     return fig
 
+@memory_logger("create_enhanced_scatter_plot: Memory")
+@log_time("create_enhanced_scatter_plot: Plotting")
 @plot_performance_logger
 def create_enhanced_scatter_plot(
     data: pd.DataFrame,
@@ -399,6 +476,8 @@ def create_enhanced_scatter_plot(
     
     return fig
 
+@memory_logger("create_enhanced_heatmap: Memory")
+@log_time("create_enhanced_heatmap: Plotting")
 @plot_performance_logger
 def create_enhanced_heatmap(
     data: pd.DataFrame,
@@ -534,6 +613,9 @@ def addAnotations(plot_all_regions, qFdrStars):
     )
     return plot_all_regions
 
+@memory_logger("create_dynamic_scatter_plot: Memory")
+@log_time("create_dynamic_scatter_plot: Plotting")
+@plot_performance_logger
 def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bottom=None):
     """
     Enhanced scatter plot creation with dynamic sizing and better performance

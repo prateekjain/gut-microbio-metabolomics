@@ -21,6 +21,8 @@ from compare_tumor.data_functions import *
 import logging
 import time
 import functools
+import psutil
+import gc
 
 from compare_tumor.dynamicPlots import tumor_vs_normal_plot, all_regions_plots, comparable_plots, addAnotations, create_dynamic_scatter_plot
 matplotlib.use("Agg")  
@@ -36,6 +38,80 @@ logging.basicConfig(
         logging.FileHandler("app.log")  # Save logs to a file
     ]
 )
+
+def memory_logger(label):
+    """Decorator to log memory usage before and after function execution"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Get memory before function execution
+            process = psutil.Process()
+            memory_before = process.memory_info().rss / 1024 / 1024  # MB
+            logging.info(f"[MEMORY] {label} - BEFORE: {memory_before:.2f} MB")
+            
+            try:
+                result = func(*args, **kwargs)
+                
+                # Get memory after function execution
+                memory_after = process.memory_info().rss / 1024 / 1024  # MB
+                memory_diff = memory_after - memory_before
+                logging.info(f"[MEMORY] {label} - AFTER: {memory_after:.2f} MB (DIFF: {memory_diff:+.2f} MB)")
+                
+                # Force garbage collection if memory increased significantly
+                if memory_diff > 50:  # If memory increased by more than 50MB
+                    logging.warning(f"[MEMORY] {label} - Large memory increase detected, forcing garbage collection")
+                    gc.collect()
+                    memory_after_gc = process.memory_info().rss / 1024 / 1024  # MB
+                    logging.info(f"[MEMORY] {label} - AFTER GC: {memory_after_gc:.2f} MB")
+                
+                return result
+            except Exception as e:
+                # Log memory even if function fails
+                memory_after = process.memory_info().rss / 1024 / 1024  # MB
+                memory_diff = memory_after - memory_before
+                logging.error(f"[MEMORY] {label} - ERROR: {memory_after:.2f} MB (DIFF: {memory_diff:+.2f} MB)")
+                raise
+        return wrapper
+    return decorator
+
+def log_memory_usage(label=""):
+    """Utility function to log current memory usage"""
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / 1024 / 1024
+    logging.info(f"[MEMORY] {label} - Current: {memory_mb:.2f} MB")
+
+def log_performance_status():
+    """Log current system performance status including memory, cache, and database pool"""
+    try:
+        # Memory status
+        process = psutil.Process()
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        cpu_percent = process.cpu_percent()
+        
+        logging.info(f"[PERFORMANCE] Current Memory: {memory_mb:.2f} MB")
+        logging.info(f"[PERFORMANCE] Current CPU: {cpu_percent:.1f}%")
+        
+        # Database pool status
+        try:
+            from compare_tumor.data_functions import db_pool
+            if db_pool._pool:
+                pool_info = db_pool._pool.get_stats()
+                logging.info(f"[PERFORMANCE] DB Pool - Min: {pool_info.get('minconn', 'N/A')}, Max: {pool_info.get('maxconn', 'N/A')}")
+        except Exception as e:
+            logging.warning(f"[PERFORMANCE] Could not get DB pool status: {e}")
+        
+        # Cache status
+        try:
+            from compare_tumor.data_functions import get_cache_info
+            cache_info = get_cache_info()
+            if cache_info:
+                logging.info(f"[PERFORMANCE] Cache status: {len(cache_info)} cached functions")
+                for func_name, info in cache_info.items():
+                    logging.info(f"[PERFORMANCE] {func_name}: {info}")
+        except Exception as e:
+            logging.warning(f"[PERFORMANCE] Could not get cache status: {e}")
+            
+    except Exception as e:
+        logging.error(f"[PERFORMANCE] Error getting performance status: {e}")
 
 # ===== PERFORMANCE OPTIMIZATION DECORATORS =====
 def performance_logger(func):
@@ -132,6 +208,8 @@ def register_callbacks(app):
         [Output(f'scatter-plot-mz_minus_h-{i}', 'figure') for i in range(7)],
         [Input('compound-dropdown', 'value')]
     )
+    @memory_logger("tumor_vs_normal_m_mins_plots: Memory")
+    @performance_logger
     def tumor_vs_normal_m_mins_plots(selected_compound):
         if selected_compound is not None:
             # Fetch and process data based on selected values
@@ -174,6 +252,8 @@ def register_callbacks(app):
         Input("selected-bacteria-gmm-b", "value"),
         Input("top-bottom-radio-b", "value")] 
     )
+    @memory_logger("update_scatter_plot_b: Memory")
+    @performance_logger
     def update_scatter_plot_b(selected_metabolite, selected_bacteria, top_bottom):
         ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
@@ -310,6 +390,7 @@ def register_callbacks(app):
         Input("top-bottom-radio-a", "value")],
         prevent_initial_call=True  # Prevent initial callback execution
     )
+    @memory_logger("update_scatter_plot_a: Memory")
     @performance_logger
     def update_scatter_plot_a(selected_metabolite, selected_bacteria, top_bottom):
         ctx = dash.callback_context
@@ -444,6 +525,8 @@ def register_callbacks(app):
         Output('normal-plot', 'figure'),
         [Input('compound-dropdown', 'value')]
     )
+    @memory_logger("tumor_normal_m_plus_plot: Memory")
+    @performance_logger
     def tumor_normal_m_plus_plot(selected_compound):
         if selected_compound is not None:
             # Fetch and process data based on selected values
@@ -482,6 +565,8 @@ def register_callbacks(app):
         Input("selected-bacteria-gmm", "value"),
         Input("top-bottom-radio", "value")] 
     )
+    @memory_logger("update_scatter_plot: Memory")
+    @performance_logger
     def update_scatter_plot(selected_metabolite, selected_bacteria, top_bottom):
         ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
@@ -607,6 +692,8 @@ def register_callbacks(app):
         Output("gmm-scatter-top-plot", "figure"),
         [Input("selected-bacteria-top", "value")],
     )
+    @memory_logger("update_scatter_top_plot: Memory")
+    @performance_logger
     def update_scatter_top_plot(selected_bacteria):
         logging.info(f"Triggered callback with bacteria: {selected_bacteria}")
 
@@ -736,6 +823,8 @@ def register_callbacks(app):
         Output("gmm-scatter-cumm-top-plot", "figure"),
         [Input("selected-bacteria-cum-top", "value")],
     )
+    @memory_logger("update_scatter_top_plot_cumm: Memory")
+    @performance_logger
     def update_scatter_top_plot(selected_bacteria):
         logging.info(f"Triggered callback with bacteria: {selected_bacteria}")
         table_name = get_table_name_from_tab("tab-a")
@@ -1028,6 +1117,8 @@ def register_callbacks(app):
             Input("selected-bacteria", "value"),
         ]
     )
+    @memory_logger("gmm_heatmap_multiple: Memory")
+    @performance_logger
     def gmm_heatmap_multiple(selected_bacteria_cols, selected_metabolite_names):
         logging.info(f"Selected Bacteria: {selected_bacteria_cols}, Selected Metabolites: {selected_metabolite_names}")
         
@@ -1110,6 +1201,8 @@ def register_callbacks(app):
             Input("selected-metabolites-heatmap-b", "value"),
         ]
     )
+    @memory_logger("gmm_heatmap_multiple_b: Memory")
+    @performance_logger
     def gmm_heatmap_multiple_b(selected_bacteria_cols, selected_metabolite_names):
         logging.info(f"In Vivo Heatmap - Selected Bacteria: {selected_bacteria_cols}, Selected Metabolites: {selected_metabolite_names}")
         
@@ -1200,6 +1293,7 @@ def register_callbacks(app):
         Output("selected-metabolite-gmm-a", "options"),
         [Input("type-filter-radio-a", "value")]
     )
+    @performance_logger
     def update_metabolite_options_a(type_filter):
         try:
             from .data_functions import get_gmm_name_by_type
@@ -1215,6 +1309,7 @@ def register_callbacks(app):
         Output("selected-metabolite-gmm-b", "options"),
         [Input("type-filter-radio-b", "value")]
     )
+    @performance_logger
     def update_metabolite_options_b(type_filter):
         try:
             from .data_functions import get_gmm_name_by_type
@@ -1230,6 +1325,7 @@ def register_callbacks(app):
         Output("selected-bacteria", "options"),
         [Input("type-filter-radio-heatmap", "value")]
     )
+    @performance_logger
     def update_metabolite_options_heatmap_a(type_filter):
         try:
             from .data_functions import get_gmm_name_by_type
@@ -1247,6 +1343,7 @@ def register_callbacks(app):
         Output("selected-metabolites-heatmap-b", "options"),
         [Input("type-filter-radio-heatmap-b", "value")]
     )
+    @performance_logger
     def update_metabolite_options_heatmap_b(type_filter):
         try:
             from .data_functions import get_gmm_name_by_type
@@ -1264,6 +1361,8 @@ def register_callbacks(app):
         Output("gmm-scatter-top-plot-b", "figure"),
         [Input("selected-bacteria-top-b", "value")],
     )
+    @memory_logger("update_scatter_top_plot_b: Memory")
+    @performance_logger
     def update_scatter_top_plot_b(selected_bacteria):
         logging.info(f"Triggered In Vivo top metabolites callback with bacteria: {selected_bacteria}")
         print(f"[DEBUG] In Vivo Top Metabolites - Selected bacteria: {selected_bacteria}")
@@ -1350,6 +1449,8 @@ def register_callbacks(app):
         Output("gmm-scatter-cumm-top-plot-b", "figure"),
         [Input("selected-bacteria-cum-top-b", "value")],
     )
+    @memory_logger("update_scatter_cumm_top_plot_b: Memory")
+    @performance_logger
     def update_scatter_cumm_top_plot_b(selected_bacteria):
         logging.info(f"Triggered In Vivo cumulative top metabolites callback with bacteria: {selected_bacteria}")
         print(f"[DEBUG] In Vivo Cumulative Top Metabolites - Selected bacteria: {selected_bacteria}")
