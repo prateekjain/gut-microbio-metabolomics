@@ -926,7 +926,7 @@ main_layout = dbc.Container(
                 html.Div(
                     className="section-spacing",
                     children=[
-                        html.H3("Metabolite-Bacteria Heatmap", className="section-heading"),
+                        html.H2("Metabolite-Bacteria Heatmap", className="section-heading"),
                         html.P(
                             "Select multiple bacteria and metabolites to visualize their relationships in an interactive heatmap.",
                             className="section-description",
@@ -1125,118 +1125,118 @@ main_layout = dbc.Container(
                 html.Div(
                     className="section-spacing",
                     children=[
-                        html.H3("Top Metabolites Analysis", className="section-heading"),
-                html.P(
-                    "Select bacteria to analyze their top metabolite producers.",
-                    className="section-description",
-                ),
-                
-                dcc.Tabs([
-                    dcc.Tab(
-                        label="In Vitro",
-                        value="top-tab-a",
-                        children=[
-                            html.Div(
-                                className="form-section",
+                        html.H2("Top Metabolites Analysis", className="section-heading"),
+                        html.P(
+                            "Select bacteria to analyze their top metabolite producers.",
+                            className="section-description",
+                        ),
+                        
+                        dcc.Tabs([
+                            dcc.Tab(
+                                label="In Vitro",
+                                value="top-tab-a",
                                 children=[
-                                    dbc.Row(
-                                        [
-                                            dbc.Col(
+                                    html.Div(
+                                        className="form-section",
+                                        children=[
+                                            dbc.Row(
                                                 [
-                                                    html.Label("Select Bacteria:", className="select-label"),
-                                                    dcc.Dropdown(
-                                                        id="selected-bacteria-top",
-                                                        options=[
-                                                            {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Select Bacteria:", className="select-label"),
+                                                            dcc.Dropdown(
+                                                                id="selected-bacteria-top",
+                                                                options=[
+                                                                    {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                                                ],
+                                                                placeholder="Select Bacteria",
+                                                                multi=True,  # Allow multi-selection
+                                                                searchable=True,
+                                                                clearable=True,
+                                                                style={"width": "100%"},
+                                                                className="select-input",
+                                                            ),
                                                         ],
-                                                        placeholder="Select Bacteria",
-                                                        multi=True,  # Allow multi-selection
-                                                        searchable=True,
-                                                        clearable=True,
-                                                        style={"width": "100%"},
-                                                        className="select-input",
+                                                        md=6,
+                                                    ),
+                                                ]
+                                            ),
+                                            dcc.Loading(
+                                                id="outer-container-plus-loading-scatter-top",
+                                                type="circle",
+                                                children=[
+                                                    html.Div(
+                                                        [
+                                                            html.Div(
+                                                                dcc.Graph(
+                                                                    id='gmm-scatter-top-plot',
+                                                                    className="gmm-scatter-top-plot",
+                                                                    config={'responsive': True},  # Enable responsiveness
+                                                                ),
+                                                                className="scatter-container-top",  # Inner scrollable container
+                                                            ),
+                                                        ],
+                                                        className="outer-container",
                                                     ),
                                                 ],
-                                                md=6,
                                             ),
                                         ]
-                                    ),
-                                    dcc.Loading(
-                                        id="outer-container-plus-loading-scatter-top",
-                                        type="circle",
-                                        children=[
-                                            html.Div(
-                                                [
-                                                    html.Div(
-                                                        dcc.Graph(
-                                                            id='gmm-scatter-top-plot',
-                                                            className="gmm-scatter-top-plot",
-                                                            config={'responsive': False},  # Enable responsiveness
-                                                        ),
-                                                        className="scatter-container-top",  # Inner scrollable container
-                                                    ),
-                                                ],
-                                                className="outer-container",
-                                            ),
-                                        ],
-                                    ),
+                                    )
                                 ]
-                            )
-                        ]
-                    ),
-                    dcc.Tab(
-                        label="In Vivo",
-                        value="top-tab-b",
-                        children=[
-                            html.Div(
-                                className="form-section",
+                            ),
+                            dcc.Tab(
+                                label="In Vivo",
+                                value="top-tab-b",
                                 children=[
-                                    dbc.Row(
-                                        [
-                                            dbc.Col(
+                                    html.Div(
+                                        className="form-section",
+                                        children=[
+                                            dbc.Row(
                                                 [
-                                                    html.Label("Select Bacteria:", className="select-label"),
-                                                    dcc.Dropdown(
-                                                        id="selected-bacteria-top-b",
-                                                        options=[
-                                                            {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Select Bacteria:", className="select-label"),
+                                                            dcc.Dropdown(
+                                                                id="selected-bacteria-top-b",
+                                                                options=[
+                                                                    {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
+                                                                ],
+                                                                placeholder="Select Bacteria",
+                                                                multi=True,  # Allow multi-selection
+                                                                searchable=True,
+                                                                clearable=True,
+                                                                style={"width": "100%"},
+                                                                className="select-input",
+                                                            ),
                                                         ],
-                                                        placeholder="Select Bacteria",
-                                                        multi=True,  # Allow multi-selection
-                                                        searchable=True,
-                                                        clearable=True,
-                                                        style={"width": "100%"},
-                                                        className="select-input",
+                                                        md=6,
+                                                    ),
+                                                ]
+                                            ),
+                                            dcc.Loading(
+                                                id="outer-container-plus-loading-scatter-top-b",
+                                                type="circle",
+                                                children=[
+                                                    html.Div(
+                                                        [
+                                                            html.Div(
+                                                                dcc.Graph(
+                                                                    id='gmm-scatter-top-plot-b',
+                                                                    className="gmm-scatter-top-plot",
+                                                                    config={'responsive': True},  # Enable responsiveness
+                                                                ),
+                                                                className="scatter-container-top",  # Inner scrollable container
+                                                            ),
+                                                        ],
+                                                        className="outer-container",
                                                     ),
                                                 ],
-                                                md=6,
                                             ),
                                         ]
-                                    ),
-                                    dcc.Loading(
-                                        id="outer-container-plus-loading-scatter-top-b",
-                                        type="circle",
-                                        children=[
-                                            html.Div(
-                                                [
-                                                    html.Div(
-                                                        dcc.Graph(
-                                                            id='gmm-scatter-top-plot-b',
-                                                            className="gmm-scatter-top-plot",
-                                                            config={'responsive': False},  # Enable responsiveness
-                                                        ),
-                                                        className="scatter-container-top",  # Inner scrollable container
-                                                    ),
-                                                ],
-                                                className="outer-container",
-                                            ),
-                                        ],
-                                    ),
+                                    )
                                 ]
-                            )
-                        ]
-                    ),
-                ], id="top-tabs", value="top-tab-a", className="tabs"),
+                            ),
+                        ], id="top-tabs", value="top-tab-a", className="tabs"),
                     ]
                 ),
                 
@@ -1245,118 +1245,118 @@ main_layout = dbc.Container(
                 html.Div(
                     className="section-spacing",
                     children=[
-                        html.H3("Cumulative Top Metabolites", className="section-heading"),
-                html.P(
-                    "Analyze cumulative metabolite production patterns across selected bacteria.",
-                    className="section-description",
-                ),
-                
-                dcc.Tabs([
-                    dcc.Tab(
-                        label="In Vitro",
-                        value="cumm-tab-a",
-                        children=[
-                            html.Div(
-                                className="form-section",
+                        html.H2("Cumulative Top Metabolites", className="section-heading"),
+                        html.P(
+                            "Analyze cumulative metabolite production patterns across selected bacteria.",
+                            className="section-description",
+                        ),
+                        
+                        dcc.Tabs([
+                            dcc.Tab(
+                                label="In Vitro",
+                                value="cumm-tab-a",
                                 children=[
-                                    dbc.Row(
-                                        [
-                                            dbc.Col(
+                                    html.Div(
+                                        className="form-section",
+                                        children=[
+                                            dbc.Row(
                                                 [
-                                                    html.Label("Select Bacteria:", className="select-label"),
-                                                    dcc.Dropdown(
-                                                        id="selected-bacteria-cum-top",
-                                                        options=[
-                                                            {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Select Bacteria:", className="select-label"),
+                                                            dcc.Dropdown(
+                                                                id="selected-bacteria-cum-top",
+                                                                options=[
+                                                                    {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
+                                                                ],
+                                                                placeholder="Select Bacteria",
+                                                                multi=True,  # Allow multi-selection
+                                                                searchable=True,
+                                                                clearable=True,
+                                                                style={"width": "100%"},
+                                                                className="select-input",
+                                                            ),
                                                         ],
-                                                        placeholder="Select Bacteria",
-                                                        multi=True,  # Allow multi-selection
-                                                        searchable=True,
-                                                        clearable=True,
-                                                        style={"width": "100%"},
-                                                        className="select-input",
+                                                        md=6,
+                                                    ),
+                                                ]
+                                            ),
+                                            dcc.Loading(
+                                                id="outer-container-plus-loading-scatter-cumm",
+                                                type="circle",
+                                                children=[
+                                                    html.Div(
+                                                        [
+                                                            html.Div(
+                                                                dcc.Graph(
+                                                                    id='gmm-scatter-cumm-top-plot',
+                                                                    className="gmm-scatter-cumm-top-plot",
+                                                                    config={'responsive': True},  # Enable responsiveness
+                                                                ),
+                                                                className="scatter-container-top",  # Inner scrollable container
+                                                            ),
+                                                        ],
+                                                        className="outer-container",
                                                     ),
                                                 ],
-                                                md=6,
                                             ),
                                         ]
-                                    ),
-                                    dcc.Loading(
-                                        id="outer-container-plus-loading-scatter-cumm",
-                                        type="circle",
-                                        children=[
-                                            html.Div(
-                                                [
-                                                    html.Div(
-                                                        dcc.Graph(
-                                                            id='gmm-scatter-cumm-top-plot',
-                                                            className="gmm-scatter-cumm-top-plot",
-                                                            config={'responsive': True},  # Enable responsiveness
-                                                        ),
-                                                        className="scatter-container-top",  # Inner scrollable container
-                                                    ),
-                                                ],
-                                                className="outer-container",
-                                            ),
-                                        ],
-                                    ),
+                                    )
                                 ]
-                            )
-                        ]
-                    ),
-                    dcc.Tab(
-                        label="In Vivo",
-                        value="cumm-tab-b",
-                        children=[
-                            html.Div(
-                                className="form-section",
+                            ),
+                            dcc.Tab(
+                                label="In Vivo",
+                                value="cumm-tab-b",
                                 children=[
-                                    dbc.Row(
-                                        [
-                                            dbc.Col(
+                                    html.Div(
+                                        className="form-section",
+                                        children=[
+                                            dbc.Row(
                                                 [
-                                                    html.Label("Select Bacteria:", className="select-label"),
-                                                    dcc.Dropdown(
-                                                        id="selected-bacteria-cum-top-b",
-                                                        options=[
-                                                            {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Select Bacteria:", className="select-label"),
+                                                            dcc.Dropdown(
+                                                                id="selected-bacteria-cum-top-b",
+                                                                options=[
+                                                                    {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
+                                                                ],
+                                                                placeholder="Select Bacteria",
+                                                                multi=True,  # Allow multi-selection
+                                                                searchable=True,
+                                                                clearable=True,
+                                                                style={"width": "100%"},
+                                                                className="select-input",
+                                                            ),
                                                         ],
-                                                        placeholder="Select Bacteria",
-                                                        multi=True,  # Allow multi-selection
-                                                        searchable=True,
-                                                        clearable=True,
-                                                        style={"width": "100%"},
-                                                        className="select-input",
+                                                        md=6,
+                                                    ),
+                                                ]
+                                            ),
+                                            dcc.Loading(
+                                                id="outer-container-plus-loading-scatter-cumm-b",
+                                                type="circle",
+                                                children=[
+                                                    html.Div(
+                                                        [
+                                                            html.Div(
+                                                                dcc.Graph(
+                                                                    id='gmm-scatter-cumm-top-plot-b',
+                                                                    className="gmm-scatter-cumm-top-plot",
+                                                                    config={'responsive': True},  # Enable responsiveness
+                                                                ),
+                                                                className="scatter-container-top",  # Inner scrollable container
+                                                            ),
+                                                        ],
+                                                        className="outer-container",
                                                     ),
                                                 ],
-                                                md=6,
                                             ),
                                         ]
-                                    ),
-                                    dcc.Loading(
-                                        id="outer-container-plus-loading-scatter-cumm-b",
-                                        type="circle",
-                                        children=[
-                                            html.Div(
-                                                [
-                                                    html.Div(
-                                                        dcc.Graph(
-                                                            id='gmm-scatter-cumm-top-plot-b',
-                                                            className="gmm-scatter-cumm-top-plot",
-                                                            config={'responsive': True},  # Enable responsiveness
-                                                        ),
-                                                        className="scatter-container-top",  # Inner scrollable container
-                                                    ),
-                                                ],
-                                                className="outer-container",
-                                            ),
-                                        ],
-                                    ),
+                                    )
                                 ]
-                            )
-                        ]
-                    ),
-                ], id="cumm-tabs", value="cumm-tab-a", className="tabs"),
+                            ),
+                        ], id="cumm-tabs", value="cumm-tab-a", className="tabs"),
                     ]
                 ),
             ]
