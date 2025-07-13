@@ -702,46 +702,16 @@ def register_callbacks(app):
         try:
             if not selected_bacteria:
                 logging.info("No bacteria selected.")
-                fig = go.Figure()
-                fig.update_layout(
-                    title="No Bacteria Selected",
-                    annotations=[
-                        dict(
-                            text="Please select bacteria from the dropdown to view the plot.",
-                            xref="paper",
-                            yref="paper",
-                            showarrow=False,
-                            font=dict(size=16),
-                            x=0.5,
-                            y=0.5,
-                        )
-                    ],
-                    template="plotly_white",
-                )
-                return fig
+                return create_empty_figure("No Bacteria Selected", "Please select bacteria from the dropdown to view the plot.")
+            
             # Fetch data for all bacteria in the top 10 metabolites
             df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria)
-            print('top 10 df',df)
+            logging.info(f'Top 10 df shape: {df.shape if df is not None else "None"}')
+            
             # Handle edge cases
             if df is None or df.empty:
                 logging.warning("No data available for scatter plot.")
-                fig = go.Figure()
-                fig.update_layout(
-                    title="No Data Available",
-                    annotations=[
-                        dict(
-                            text="No data found for the selected bacteria.",
-                            xref="paper",
-                            yref="paper",
-                            showarrow=False,
-                            font=dict(size=16),
-                            x=0.5,
-                            y=0.5,
-                        )
-                    ],
-                    template="plotly_white",
-                )
-                return fig
+                return create_empty_figure("No Data Available", "No data found for the selected bacteria.")
 
             # Filter the DataFrame to include only the selected bacteria
             if selected_bacteria:
@@ -749,74 +719,22 @@ def register_callbacks(app):
 
             if df.empty:
                 logging.info("Selected bacteria do not meet the conditions.")
-                fig = go.Figure()
-                fig.update_layout(
-                    title="No Data Available for Selected Bacteria",
-                    annotations=[
-                        dict(
-                            text="Please select any other bacteria.",
-                            xref="paper",
-                            yref="paper",
-                            showarrow=False,
-                            font=dict(size=16),
-                            x=0.5,
-                            y=0.5,
-                        )
-                    ],
-                    template="plotly_white",
-                )
-                return fig
+                return create_empty_figure("No Data Available for Selected Bacteria", "Please select any other bacteria.")
 
-            # Prepare the scatter plot
-            fig = go.Figure()
-
-            # Group data by bacteria and metabolite for plotting
-            for bacteria, group in df.groupby("bacteria"):
-                fig.add_trace(
-                    go.Scatter(
-                        x=group["metabolite"],
-                        y=group["value"],
-                        mode="markers",
-                        marker=dict(size=10),
-                        name=bacteria,
-                    )
-                )
-
-            # Calculate dynamic width based on the number of metabolites
-            num_metabolites = len(df["metabolite"].unique())
-            plot_width = max(800, num_metabolites * 40)
-
-            # Update layout
-            fig.update_layout(
-                title="Scatter Plot of Top 10 Metabolites for Selected Bacteria",
-                xaxis_title="Metabolite",
-                yaxis_title="Value",
-                template="plotly_white",
-                width=plot_width,
-                xaxis=dict(tickangle=90, showgrid=True),
-                yaxis=dict(showgrid=True),
-                legend_title="Bacteria",
-                showlegend=True,  # Force show legend
-                legend=dict(
-                    y=1.15,
-                    x=1,
-                    bgcolor='rgba(255, 255, 255, 0.8)',
-                    bordercolor='rgba(0,0,0,0.1)',
-                    borderwidth=1
-                ),
-                margin=dict(
-                    t=100,
-                    b=50,
-                    l=50,
-                    r=50
-                )
+            # Use the optimized plotting function from dynamicPlots.py
+            from compare_tumor.dynamicPlots import create_dynamic_scatter_plot
+            
+            fig = create_dynamic_scatter_plot(
+                data=df,
+                plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
+                title="Top 10 Metabolites for Selected Bacteria"
             )
 
             return fig
 
         except Exception as e:
             logging.error("Error in callback: %s", e)
-            return go.Figure()
+            return create_empty_figure("Error", str(e))
 
     
     @app.callback(
@@ -845,95 +763,13 @@ def register_callbacks(app):
                     f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite."
                 )
 
-            # Create scatter plot with improvements
-            fig = go.Figure()
-
-            # Sort metabolites by average value to improve readability
-            # Modified to handle duplicates
-            metabolite_order = (df.groupby('metabolite')['value']
-                            .mean()
-                            .sort_values(ascending=False)
-                            .index.unique())  # Add unique() to handle duplicates
-
-            bacteria_list = sorted(df['bacteria'].unique())
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-                    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-            color_map = dict(zip(bacteria_list, colors[:len(bacteria_list)]))
-
-            for bacteria in bacteria_list:
-                group = df[df['bacteria'] == bacteria]
-                
-                # Modified to handle duplicates without reindexing
-                group = group.sort_values('metabolite').drop_duplicates(['metabolite', 'bacteria'])
-                
-                fig.add_trace(
-                    go.Scatter(
-                        x=group["metabolite"],
-                        y=group["value"],
-                        mode="markers",
-                        marker=dict(
-                            size=12,
-                            symbol='circle',
-                            color=color_map[bacteria],
-                            line=dict(width=1, color='white')
-                        ),
-                        name=bacteria.replace('_', ' ').title(),
-                        hovertemplate=(
-                            "<b>Bacteria:</b> %{fullData.name}<br>" +
-                            "<b>Metabolite:</b> %{x}<br>" +
-                            "<b>Value:</b> %{y:.2f}<br>" +
-                            "<extra></extra>"
-                        )
-                    )
-                )
-
-            scatter_width = max(1000, len(metabolite_order) * 50)
+            # Use the optimized plotting function from dynamicPlots.py
+            from compare_tumor.dynamicPlots import create_dynamic_scatter_plot
             
-            # Rest of the layout remains the same
-            fig.update_layout(
-                title={
-                    'text': "Metabolites where Selected Bacteria are Collectively in Top 10 Producers",
-                    'y':0.95,
-                    'x':0.5,
-                    'xanchor': 'center',
-                    'yanchor': 'top'
-                },
-                xaxis_title="Metabolite",
-                yaxis_title="Value",
-                template="plotly_white",
-                width=scatter_width,
-                height=600,
-                showlegend=True,
-                legend=dict(
-                    yanchor="top",
-                    y=1,
-                    xanchor="right",
-                    x=1.15,
-                    bgcolor='rgba(255, 255, 255, 0.8)'
-                ),
-                xaxis=dict(
-                    tickangle=45,
-                    showgrid=True,
-                    gridwidth=1,
-                    gridcolor='lightgray',
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black',
-                    tickfont=dict(size=10),
-                    range=[-0.5, len(metabolite_order) - 0.5]
-                ),
-                yaxis=dict(
-                    showgrid=True,
-                    gridwidth=1,
-                    gridcolor='lightgray',
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black',
-                    zeroline=True,
-                    zerolinewidth=1,
-                    zerolinecolor='black'
-                ),
-                plot_bgcolor='white'
+            fig = create_dynamic_scatter_plot(
+                data=df,
+                plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
+                title="Metabolites where Selected Bacteria are Collectively in Top 10 Producers"
             )
 
             return fig
@@ -1365,7 +1201,6 @@ def register_callbacks(app):
     @performance_logger
     def update_scatter_top_plot_b(selected_bacteria):
         logging.info(f"Triggered In Vivo top metabolites callback with bacteria: {selected_bacteria}")
-        print(f"[DEBUG] In Vivo Top Metabolites - Selected bacteria: {selected_bacteria}")
 
         table_name = "in_vivo"  # Use in_vivo table
 
@@ -1376,7 +1211,7 @@ def register_callbacks(app):
             
             # Fetch data for all bacteria in the top 10 metabolites
             df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria)
-            print(f'[DEBUG] In Vivo top 10 df: {df.shape if df is not None else "None"}')
+            logging.info(f'In Vivo top 10 df shape: {df.shape if df is not None else "None"}')
 
             if df is None or df.empty:
                 logging.warning("No data found for selected bacteria in In Vivo top metabolites")
@@ -1392,56 +1227,19 @@ def register_callbacks(app):
                     "The selected bacteria are not in the top 10 for any metabolite."
                 )
 
-            # Create scatter plot
-            fig = go.Figure()
-
-            # Group data by bacteria and metabolite for plotting
-            for bacteria, group in df.groupby("bacteria"):
-                fig.add_trace(
-                    go.Scatter(
-                        x=group["metabolite"],
-                        y=group["value"],
-                        mode="markers",
-                        marker=dict(size=10),
-                        name=bacteria,
-                    )
-                )
-
-            # Calculate dynamic width based on the number of metabolites
-            num_metabolites = len(df["metabolite"].unique())
-            plot_width = max(800, num_metabolites * 40)
-
-            # Update layout
-            fig.update_layout(
-                title="In Vivo: Top 10 Metabolites for Selected Bacteria",
-                xaxis_title="Metabolite",
-                yaxis_title="Value",
-                template="plotly_white",
-                width=plot_width,
-                xaxis=dict(tickangle=90, showgrid=True),
-                yaxis=dict(showgrid=True),
-                legend_title="Bacteria",
-                showlegend=True,
-                legend=dict(
-                    y=1.15,
-                    x=1,
-                    bgcolor='rgba(255, 255, 255, 0.8)',
-                    bordercolor='rgba(0,0,0,0.1)',
-                    borderwidth=1
-                ),
-                margin=dict(
-                    t=100,
-                    b=50,
-                    l=50,
-                    r=50
-                )
+            # Use the optimized plotting function from dynamicPlots.py
+            from compare_tumor.dynamicPlots import create_dynamic_scatter_plot
+            
+            fig = create_dynamic_scatter_plot(
+                data=df,
+                plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
+                title="In Vivo: Top 10 Metabolites for Selected Bacteria"
             )
 
             return fig
 
         except Exception as e:
             logging.error("Error in In Vivo top metabolites callback: %s", e)
-            print(f"[DEBUG] Error in In Vivo top metabolites callback: {e}")
             return create_empty_figure("Error", str(e))
 
     # Callback for In Vivo Cumulative Top Metabolites Analysis
@@ -1453,7 +1251,6 @@ def register_callbacks(app):
     @performance_logger
     def update_scatter_cumm_top_plot_b(selected_bacteria):
         logging.info(f"Triggered In Vivo cumulative top metabolites callback with bacteria: {selected_bacteria}")
-        print(f"[DEBUG] In Vivo Cumulative Top Metabolites - Selected bacteria: {selected_bacteria}")
         
         table_name = "in_vivo"  # Use in_vivo table
 
@@ -1470,103 +1267,22 @@ def register_callbacks(app):
             if df is None or df.empty:
                 return create_empty_figure(
                     "No Matching Data", 
-                    f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite in In Vivo data."
+                    f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite."
                 )
 
-            # Create scatter plot with improvements
-            fig = go.Figure()
-
-            # Sort metabolites by average value to improve readability
-            metabolite_order = (df.groupby('metabolite')['value']
-                            .mean()
-                            .sort_values(ascending=False)
-                            .index.unique())
-
-            bacteria_list = sorted(df['bacteria'].unique())
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-                    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-            color_map = dict(zip(bacteria_list, colors[:len(bacteria_list)]))
-
-            for bacteria in bacteria_list:
-                group = df[df['bacteria'] == bacteria]
-                
-                # Handle duplicates without reindexing
-                group = group.sort_values('metabolite').drop_duplicates(['metabolite', 'bacteria'])
-                
-                fig.add_trace(
-                    go.Scatter(
-                        x=group["metabolite"],
-                        y=group["value"],
-                        mode="markers",
-                        marker=dict(
-                            size=12,
-                            symbol='circle',
-                            color=color_map[bacteria],
-                            line=dict(width=1, color='white')
-                        ),
-                        name=bacteria.replace('_', ' ').title(),
-                        hovertemplate=(
-                            "<b>Bacteria:</b> %{fullData.name}<br>" +
-                            "<b>Metabolite:</b> %{x}<br>" +
-                            "<b>Value:</b> %{y:.2f}<br>" +
-                            "<extra></extra>"
-                        )
-                    )
-                )
-
-            scatter_width = max(1000, len(metabolite_order) * 50)
+            # Use the optimized plotting function from dynamicPlots.py
+            from compare_tumor.dynamicPlots import create_dynamic_scatter_plot
             
-            fig.update_layout(
-                title={
-                    'text': "In Vivo: Metabolites where Selected Bacteria are Collectively in Top 10 Producers",
-                    'y':0.95,
-                    'x':0.5,
-                    'xanchor': 'center',
-                    'yanchor': 'top'
-                },
-                xaxis_title="Metabolite",
-                yaxis_title="Value",
-                template="plotly_white",
-                width=scatter_width,
-                height=600,
-                showlegend=True,
-                legend=dict(
-                    yanchor="top",
-                    y=1,
-                    xanchor="right",
-                    x=1.15,
-                    bgcolor='rgba(255, 255, 255, 0.8)'
-                ),
-                xaxis=dict(
-                    tickangle=45,
-                    showgrid=True,
-                    gridwidth=1,
-                    gridcolor='lightgray',
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black',
-                    tickfont=dict(size=10),
-                    range=[-0.5, len(metabolite_order) - 0.5]
-                ),
-                yaxis=dict(
-                    showgrid=True,
-                    gridwidth=1,
-                    gridcolor='lightgray',
-                    showline=True,
-                    linewidth=1,
-                    linecolor='black',
-                    zeroline=True,
-                    zerolinewidth=1,
-                    zerolinecolor='black'
-                ),
-                plot_bgcolor='white'
+            fig = create_dynamic_scatter_plot(
+                data=df,
+                plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
+                title="In Vivo: Metabolites where Selected Bacteria are Collectively in Top 10 Producers"
             )
 
             return fig
 
         except Exception as e:
-            logging.error("Error in In Vivo cumulative top metabolites callback: %s", e)
-            print(f"[DEBUG] Error in In Vivo cumulative top metabolites callback: {e}")
+            logging.error("Error in In Vivo cumulative callback: %s", e)
             return create_empty_figure("Error", str(e))
 
 

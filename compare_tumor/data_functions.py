@@ -142,6 +142,21 @@ def log_memory_usage(label=""):
     memory_mb = process.memory_info().rss / 1024 / 1024
     logging.info(f"[MEMORY] {label} - Current: {memory_mb:.2f} MB")
 
+def log_performance_status():
+    """Log current performance status and memory usage"""
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / 1024 / 1024
+    cpu_percent = process.cpu_percent()
+    
+    logging.info(f"[PERFORMANCE] Memory: {memory_mb:.2f} MB, CPU: {cpu_percent:.1f}%")
+    
+    # Log cache status
+    cache_info = get_cache_info()
+    if cache_info:
+        logging.info(f"[CACHE] Active caches: {len(cache_info)}")
+        for func_name, info in cache_info.items():
+            logging.info(f"[CACHE] {func_name}: {info['size']}/{info['max_size']} entries")
+
 # ===== CONNECTION POOL SETUP =====
 class DatabasePool:
     _instance = None
@@ -421,7 +436,7 @@ def get_all_columns_data_all_compounds(table_name):
 def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
     """
     OPTIMIZED: Fetches metabolites for selected bacteria where they rank in top 10 producers.
-    Maintains original logic: ranks selected bacteria against ALL bacteria, not just selected bacteria.
+    Simplified query to avoid TLE issues.
     
     Args:
         table_name (str): Name of the table in the database.
@@ -451,54 +466,50 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
             
             logging.info("Valid bacteria columns: %s", valid_bacteria)
             
-            # Get ALL bacteria columns for proper ranking
-            cursor.execute(f"""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = %s 
-                AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
-                AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
-            """, (table_name,))
-            all_bacteria_columns = [row[0] for row in cursor.fetchall()]
+            # SIMPLIFIED APPROACH: Get data for selected bacteria only, then rank them
+            # This avoids the massive UNION ALL operation that causes TLE
             
-            logging.info("Total bacteria columns for ranking: %d", len(all_bacteria_columns))
+            # Build a simpler query that only looks at selected bacteria
+            bacteria_conditions = []
+            for bacteria in valid_bacteria:
+                bacteria_conditions.append(f'"{bacteria}" IS NOT NULL AND "{bacteria}" > 0')
             
-            # HIGHLY OPTIMIZED QUERY: Use efficient ranking with minimal data processing
-            # Build the ranking query more efficiently
-            union_parts = []
-            for col in all_bacteria_columns:
-                union_parts.append(f'SELECT name, \'{col}\' AS bacteria, "{col}"::double precision AS value FROM {table_name} WHERE "{col}" IS NOT NULL AND "{col}" > 0')
-            union_query = ' UNION ALL '.join(union_parts)
+            # Get metabolites where at least one selected bacteria has a value
+            where_clause = ' OR '.join(bacteria_conditions)
             
+            # Build the unpivot query only for selected bacteria
+            unpivot_parts = []
+            for bacteria in valid_bacteria:
+                unpivot_parts.append(f'SELECT name as metabolite, \'{bacteria}\' as bacteria, "{bacteria}"::double precision as value FROM {table_name} WHERE "{bacteria}" IS NOT NULL AND "{bacteria}" > 0')
+            
+            unpivot_query = ' UNION ALL '.join(unpivot_parts)
+            
+            # Simplified ranking query - only rank within selected bacteria
             ranking_query = f"""
-            WITH AllBacteriaRanking AS (
-                SELECT 
-                    name AS metabolite,
-                    bacteria::text,
-                    value::double precision,
-                    ROW_NUMBER() OVER (PARTITION BY name ORDER BY value DESC) AS rank
-                FROM (
-                    {union_query}
-                ) all_data
+            WITH SelectedBacteriaData AS (
+                {unpivot_query}
             ),
-            Top10PerMetabolite AS (
-                SELECT metabolite, bacteria, value, rank
-                FROM AllBacteriaRanking 
-                WHERE rank <= 10
+            RankedBacteria AS (
+                SELECT 
+                    metabolite,
+                    bacteria,
+                    value,
+                    ROW_NUMBER() OVER (PARTITION BY metabolite ORDER BY value DESC) AS rank
+                FROM SelectedBacteriaData
             )
             SELECT metabolite, bacteria, value, rank
-            FROM Top10PerMetabolite
-            WHERE bacteria = ANY(%s)
+            FROM RankedBacteria
+            WHERE rank <= 10
             ORDER BY metabolite, rank;
             """
             
-            logging.info("Executing optimized query with proper ranking against all %d bacteria", len(all_bacteria_columns))
+            logging.info("Executing simplified query for %d selected bacteria", len(valid_bacteria))
             
-            cursor.execute(ranking_query, (valid_bacteria,))
+            cursor.execute(ranking_query)
             data = cursor.fetchall()
             
             if not data:
-                logging.warning("No data found for selected bacteria in the top 10 metabolites: %s", selected_bacteria)
+                logging.warning("No data found for selected bacteria: %s", selected_bacteria)
                 return None
 
             # Create DataFrame with optimized memory usage
@@ -523,9 +534,8 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 @simple_cache(max_size=50, ttl=600)
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
     """
-    HIGHLY OPTIMIZED: Fetches metabolites where ALL selected bacteria appear together in the top 10 producers.
-    Uses efficient aggregation and ranking to avoid massive UNION ALL operations.
-    Maintains original logic: ranks selected bacteria against ALL bacteria, not just selected bacteria.
+    OPTIMIZED: Fetches metabolites where ALL selected bacteria appear together in the top 10 producers.
+    Simplified approach to avoid TLE issues.
     """
     logging.info("Fetching cumulative top metabolites for selected bacteria: %s", selected_bacteria)
     if not selected_bacteria:
@@ -548,93 +558,50 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
             
             logging.info("Valid bacteria columns for cumulative analysis: %s", valid_bacteria)
             
-            # Get ALL bacteria columns for proper ranking
-            cursor.execute(f"""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = %s 
-                AND data_type IN ('double precision', 'numeric', 'integer', 'real', 'float', 'decimal')
-                AND column_name NOT IN ('name', 'mz', 'rt', 'list_2_match', 'Type', 'Metabolite')
-            """, (table_name,))
-            all_bacteria_columns = [row[0] for row in cursor.fetchall()]
+            # SIMPLIFIED APPROACH: Get metabolites where ALL selected bacteria have values > 0
+            # Then rank them within the selected bacteria only
             
-            logging.info("Total bacteria columns for cumulative ranking: %d", len(all_bacteria_columns))
+            # Build the unpivot query only for selected bacteria
+            unpivot_parts = []
+            for bacteria in valid_bacteria:
+                unpivot_parts.append(f'SELECT name as metabolite, \'{bacteria}\' as bacteria, "{bacteria}"::double precision as value FROM {table_name} WHERE "{bacteria}" IS NOT NULL AND "{bacteria}" > 0')
             
-            # Build the selected bacteria columns for the main query
-            selected_cols = [f'"{col}"' for col in valid_bacteria]
-            selected_cols_str = ', '.join(selected_cols)
+            unpivot_query = ' UNION ALL '.join(unpivot_parts)
             
-            # Build the ranking comparison columns (all bacteria for proper ranking)
-            ranking_cols = [f'"{col}"' for col in all_bacteria_columns]
-            ranking_cols_str = ', '.join(ranking_cols)
-            
-            # HIGHLY OPTIMIZED QUERY: Use efficient ranking with minimal data processing
-            # First, get metabolites where ALL selected bacteria have values > 0
-            values_clause = ', '.join([f'("{col}", "{col}")' for col in valid_bacteria])
-            cross_join_values = ', '.join([f'("{col}", t_data."{col}")' for col in valid_bacteria])
-            union_parts = []
-            for col in all_bacteria_columns:
-                union_parts.append(f'SELECT name, \'{col}\' AS bacteria, "{col}"::double precision AS value FROM {table_name} WHERE "{col}" IS NOT NULL AND "{col}" > 0')
-            union_query = ' UNION ALL '.join(union_parts)
-            
-            base_query = f"""
-            WITH ValidMetabolites AS (
-                SELECT name AS metabolite
-                FROM {table_name}
-                WHERE name IS NOT NULL
-                AND {len(valid_bacteria)} = (
-                    SELECT COUNT(*)
-                    FROM (VALUES {values_clause}) AS t(col_name, value)
-                    WHERE value IS NOT NULL AND value > 0
-                )
+            # Simplified query that finds metabolites where ALL selected bacteria have values
+            # and then ranks them within the selected bacteria
+            simplified_query = f"""
+            WITH SelectedBacteriaData AS (
+                {unpivot_query}
             ),
-            SelectedBacteriaUnpivot AS (
-                SELECT 
-                    vm.metabolite,
-                    t.col_name::text AS bacteria,
-                    t.value::double precision
-                FROM ValidMetabolites vm
-                JOIN {table_name} t_data ON vm.metabolite = t_data.name
-                CROSS JOIN LATERAL (
-                    VALUES {cross_join_values}
-                ) AS t(col_name, value)
-                WHERE t.value IS NOT NULL AND t.value > 0
-            ),
-            AllBacteriaRanking AS (
-                SELECT 
-                    name AS metabolite,
-                    bacteria::text,
-                    value::double precision,
-                    ROW_NUMBER() OVER (PARTITION BY name ORDER BY value DESC) AS rank
-                FROM (
-                    {union_query}
-                ) all_data
-            ),
-            Top10PerMetabolite AS (
-                SELECT metabolite, bacteria, value, rank
-                FROM AllBacteriaRanking 
-                WHERE rank <= 10
-            ),
-            MetabolitesWithAllSelected AS (
+            MetabolitesWithAllBacteria AS (
                 SELECT metabolite
-                FROM Top10PerMetabolite
-                WHERE bacteria = ANY(%s)
+                FROM SelectedBacteriaData
                 GROUP BY metabolite
                 HAVING COUNT(DISTINCT bacteria) = {len(valid_bacteria)}
+            ),
+            RankedBacteria AS (
+                SELECT 
+                    s.metabolite,
+                    s.bacteria,
+                    s.value,
+                    ROW_NUMBER() OVER (PARTITION BY s.metabolite ORDER BY s.value DESC) AS rank
+                FROM SelectedBacteriaData s
+                JOIN MetabolitesWithAllBacteria m ON s.metabolite = m.metabolite
             )
-            SELECT s.metabolite, s.bacteria, s.value, t.rank
-            FROM SelectedBacteriaUnpivot s
-            JOIN MetabolitesWithAllSelected m USING (metabolite)
-            JOIN Top10PerMetabolite t ON s.metabolite = t.metabolite AND s.bacteria::text = t.bacteria::text
-            ORDER BY s.metabolite, t.rank;
+            SELECT metabolite, bacteria, value, rank
+            FROM RankedBacteria
+            WHERE rank <= 10
+            ORDER BY metabolite, rank;
             """
             
-            logging.info("Executing highly optimized cumulative query")
-            cursor.execute(base_query, (valid_bacteria,))
+            logging.info("Executing simplified cumulative query for %d selected bacteria", len(valid_bacteria))
+            
+            cursor.execute(simplified_query)
             data = cursor.fetchall()
             
             if not data:
-                logging.warning("No metabolites found where all selected bacteria appear together in top 10")
+                logging.warning("No metabolites found where all selected bacteria appear together")
                 return None
 
             # Create DataFrame with optimized memory usage
