@@ -17,6 +17,9 @@ import time
 from typing import List, Dict, Optional, Tuple, Union
 import psutil
 import gc
+import redis
+import json
+from .simple_redis_cache import simple_redis_cache, get_simple_redis_cache
 
 # Configure logging
 logging.basicConfig(
@@ -284,6 +287,7 @@ def selected_mz_cleaning(selected_mz):
 @memory_logger("get_gmm_name: Memory")
 @log_time("get_gmm_name: DB Query")
 @simple_cache(max_size=50, ttl=600)
+@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_gmm_name(table_name):
     """
     Fetches all distinct values from the 'name' column in the specified table.
@@ -386,6 +390,7 @@ def get_all_columns_data(table_name, selected_compound):
 @memory_logger("get_all_columns_data_all_compounds: Memory")
 @log_time("get_all_columns_data_all_compounds: DB Query")
 @simple_cache(max_size=10, ttl=900)  # Cache for 15 minutes - larger tables need longer cache
+@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_all_columns_data_all_compounds(table_name):
     """
     Fetches all rows and columns from the given table.
@@ -531,16 +536,20 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 
 @memory_logger("get_multiple_bacteria_cumm_top_metabolites: Memory")
 @log_time("get_multiple_bacteria_cumm_top_metabolites: DB Query")
-@simple_cache(max_size=50, ttl=600)
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
-    """
-    OPTIMIZED: Fetches metabolites where ALL selected bacteria appear together in the top 10 producers.
-    Simplified approach to avoid TLE issues.
-    """
-    logging.info("Fetching cumulative top metabolites for selected bacteria: %s", selected_bacteria)
     if not selected_bacteria:
         return None
 
+    # 1. Build a cache key (sort for consistency)
+    key = f"cumm_top:{table_name}:{','.join(sorted(selected_bacteria))}"
+
+    # 2. Try Redis cache
+    cached_df = redis_cache_get(key)
+    if cached_df is not None:
+        logging.info("Loaded cumulative top metabolites from Redis cache.")
+        return cached_df
+
+    # 3. Run the expensive query as before
     try:
         with get_db_connection() as cursor:
             # Validate that selected bacteria columns exist
@@ -613,6 +622,11 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
             result_df = result_df.dropna(subset=['value'])
 
             logging.info("Cumulative analysis completed. Shape: %s", result_df.shape)
+
+            # 4. Save to Redis cache
+            if result_df is not None and not result_df.empty:
+                redis_cache_set(key, result_df, ttl=3600)  # 1 hour TTL
+
             return result_df
 
     except Exception as e:
@@ -623,6 +637,7 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
 @memory_logger("get_metabolite_data: Memory")
 @log_time("get_metabolite_data: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache metabolite data for 5 minutes
+@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_metabolite_data(table_name, metabolite):
     """Fetch all bacteria values for a specific metabolite"""
     try:
@@ -663,6 +678,7 @@ def get_metabolite_data(table_name, metabolite):
 @memory_logger("get_bacteria_data: Memory")
 @log_time("get_bacteria_data: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache bacteria data for 5 minutes
+@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_bacteria_data(table_name, bacteria):
     """Fetch all metabolite values for a specific bacteria"""
     try:
@@ -688,6 +704,7 @@ def get_bacteria_data(table_name, bacteria):
             
 @log_time("get_column_names: DB Query")
 @simple_cache(max_size=20, ttl=600)  # Cache column names for 10 minutes
+@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_column_names(table_name):
     """
     Fetches all column names except the 'name' column from the table.
@@ -768,6 +785,7 @@ def get_bacteria_names(table_name):
 @memory_logger("get_top_bottom_bacteria_values: Memory")
 @log_time("get_top_bottom_bacteria_values: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache for 5 minutes
+@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, order="desc"):
     """
     Fetches top/bottom N bacteria values for a selected compound, with processing offloaded to the database.
@@ -1730,3 +1748,24 @@ def get_cache_info():
 # 3. Use materialized views for complex aggregations that are queried frequently
 # 
 # 4. Monitor query performance with EXPLAIN ANALYZE
+
+# Get Redis URL from environment
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.Redis.from_url(REDIS_URL)
+
+try:
+    redis_client.ping()
+    print("Redis connection successful!")
+except Exception as e:
+    print(f"Redis connection failed: {e}")
+
+def redis_cache_get(key):
+    value = redis_client.get(key)
+    if value is not None:
+        # Assume value is JSON-encoded DataFrame
+        return pd.read_json(value)
+    return None
+
+def redis_cache_set(key, df, ttl=3600):
+    # Store DataFrame as JSON string
+    redis_client.setex(key, ttl, df.to_json())

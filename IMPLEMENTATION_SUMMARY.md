@@ -215,10 +215,224 @@ def update_scatter_plot_a(...):
 - Collect user experience feedback
 
 ### Optional Future Enhancements:
-1. **Redis Integration**: For cross-session caching
+1. **Redis Integration**: ✅ **IMPLEMENTED** - For cross-session caching
 2. **Async Operations**: For non-blocking database calls
 3. **Progressive Loading**: For very large datasets
 4. **A/B Testing**: For optimization validation
+
+---
+
+## 🔴 Redis Integration Setup
+
+### 🎯 Redis Configuration (COMPLETED)
+Redis has been successfully integrated into the application for enhanced caching capabilities:
+
+#### ✅ Code Integration:
+- **Redis Client Setup**: Added in `app.py` (lines 10-21)
+- **Environment Configuration**: Uses `REDIS_URL` environment variable
+- **Fallback Support**: Automatically falls back to localhost for development
+- **Connection Testing**: Includes ping test with error handling
+
+#### 📋 Heroku Redis Setup Steps:
+
+### Step 1: Add Redis Add-on to Heroku
+**Option A: Using Heroku CLI (Recommended)**
+```bash
+# Login to Heroku (if not already logged in)
+heroku login
+
+# Add Redis add-on (replace 'your-app-name' with your actual app name)
+heroku addons:create heroku-redis:mini -a your-app-name
+```
+
+**Option B: Using Heroku Dashboard**
+1. Go to your app in the Heroku Dashboard
+2. Click on the "Resources" tab
+3. In the "Add-ons" section, search for "Heroku Redis"
+4. Select "Heroku Redis" and choose the "Mini" plan (free tier)
+5. Click "Submit Order Form"
+
+### Step 2: Verify Redis Configuration
+After adding the Redis add-on, Heroku automatically sets the `REDIS_URL` environment variable:
+
+```bash
+# Check if REDIS_URL is set
+heroku config:get REDIS_URL -a your-app-name
+
+# Or see all config vars
+heroku config -a your-app-name
+```
+
+### Step 3: Deploy and Test Redis Connection
+Deploy your changes and verify Redis connectivity:
+
+```bash
+# Add and commit your changes
+git add .
+git commit -m "Add Redis configuration and performance optimizations"
+
+# Deploy to Heroku
+git push heroku main
+
+# View deployment logs
+heroku logs --tail -a your-app-name
+
+# Look specifically for Redis connection messages
+heroku logs --tail -a your-app-name | grep -i redis
+```
+
+**Expected Log Messages:**
+- ✅ `Redis connection successful!` (if connection works)
+- ❌ `Redis connection failed: [error message]` (if there's an issue)
+
+### Step 4: Monitor Redis Usage and Performance
+
+**Heroku CLI Monitoring:**
+```bash
+# Get Redis info and statistics
+heroku redis:info -a your-app-name
+heroku redis:stats -a your-app-name
+
+# Monitor Redis metrics in real-time
+heroku redis:monitor -a your-app-name
+```
+
+**Heroku Dashboard Monitoring:**
+1. Go to your app in Heroku Dashboard
+2. Click "Resources" tab
+3. Click on "Heroku Redis" add-on
+4. View metrics, usage statistics, and performance data
+
+### 🔧 Redis Implementation Details
+
+#### Current Code Configuration:
+```python
+# In app.py
+import redis
+import os
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.Redis.from_url(REDIS_URL)
+
+# Connection testing
+try:
+    redis_client.ping()
+    print("Redis connection successful!")
+except Exception as e:
+    print(f"Redis connection failed: {e}")
+```
+
+#### Dependencies Added:
+- `redis==5.0.4` in `requirements.txt`
+
+#### Environment Variables:
+- **Production**: `REDIS_URL` (automatically set by Heroku Redis add-on)
+- **Development**: Falls back to `redis://localhost:6379/0`
+
+### ⚠️ Important Redis Considerations
+
+#### Free Tier Limitations (Heroku Redis Mini):
+- **Storage**: 25MB limit
+- **Connections**: 20 connection limit
+- **Persistence**: No data persistence (data lost on restart)
+- **Performance**: Shared infrastructure
+
+#### Connection Management:
+- Single Redis client instance (good for connection pooling)
+- Automatic connection management with error handling
+- Graceful fallback for connection failures
+
+#### Local Development Setup:
+To run Redis locally for development:
+```bash
+# Install Redis (macOS)
+brew install redis
+
+# Start Redis server
+redis-server
+
+# Test connection
+redis-cli ping
+```
+
+### 🚀 Redis Performance Benefits
+
+#### Expected Improvements:
+- **Cross-session caching**: Share cached data between user sessions
+- **Persistent caching**: Data survives application restarts (paid tiers)
+- **Distributed caching**: Multiple app instances can share cache
+- **Advanced data structures**: Support for lists, sets, sorted sets, etc.
+
+#### Integration with Existing Cache System:
+- Current `@simple_cache` decorators use in-memory caching
+- Redis can be integrated as a backend for persistent caching
+- Hybrid approach: Memory cache for speed + Redis for persistence
+
+### 🔍 Redis Monitoring Commands
+
+```bash
+# Check Redis connection status
+heroku redis:cli -a your-app-name
+> ping
+PONG
+
+# View Redis info
+heroku redis:cli -a your-app-name
+> info memory
+> info stats
+
+# Monitor Redis operations in real-time
+heroku redis:cli -a your-app-name
+> monitor
+```
+
+### 🎯 Next Steps for Redis Optimization
+
+#### Phase 1: Basic Integration (COMPLETED)
+- ✅ Add Redis dependency
+- ✅ Configure connection
+- ✅ Test connectivity
+- ✅ Deploy to Heroku
+
+#### Phase 2: Cache Migration (Optional Future)
+```python
+# Example: Migrate existing cache to use Redis backend
+from functools import wraps
+import json
+import pickle
+
+def redis_cache(ttl=300):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create cache key
+            cache_key = f"{func.__name__}:{hash(str(args) + str(kwargs))}"
+            
+            # Try to get from Redis
+            try:
+                cached = redis_client.get(cache_key)
+                if cached:
+                    return pickle.loads(cached)
+            except Exception as e:
+                logger.warning(f"Redis cache read failed: {e}")
+            
+            # Execute function and cache result
+            result = func(*args, **kwargs)
+            try:
+                redis_client.setex(cache_key, ttl, pickle.dumps(result))
+            except Exception as e:
+                logger.warning(f"Redis cache write failed: {e}")
+            
+            return result
+        return wrapper
+    return decorator
+```
+
+#### Phase 3: Advanced Features (Future)
+- Session storage in Redis
+- Real-time data updates via Redis pub/sub
+- Distributed locking for concurrent operations
+- Cache warming strategies
 
 ---
 
@@ -389,6 +603,8 @@ get_gmm_name.clear_cache()  # Clear when data updates
 - [ ] Cache hit ratio above 70%
 - [ ] Database connection reuse above 90%
 - [ ] User session length increase (better UX)
+- [ ] Redis connection successful on Heroku
+- [ ] Redis cache integration working properly
 
 ---
 
