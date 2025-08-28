@@ -536,6 +536,7 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 
 @memory_logger("get_multiple_bacteria_cumm_top_metabolites: Memory")
 @log_time("get_multiple_bacteria_cumm_top_metabolites: DB Query")
+@simple_cache(max_size=50, ttl=600)  # Cache for 10 minutes as fallback
 @simple_redis_cache()  # Use our new Redis cache system
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
     if not selected_bacteria:
