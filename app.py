@@ -10,8 +10,8 @@ import time
 import redis
 import os
 
-# Redis Cloud configuration - prioritize REDISCLOUD_URL from Heroku add-on
-REDIS_URL = os.getenv("REDISCLOUD_URL") or os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# Redis configuration - Redis Cloud for production, localhost for development
+REDIS_URL = os.getenv("REDISCLOUD_URL", "redis://localhost:6379/0")
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=False, socket_connect_timeout=5, socket_timeout=5)
 
 try:
@@ -54,6 +54,9 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
                 suppress_callback_exceptions=True)
 app.title = 'Gut Microbio Metabolomics'
 server = app.server
+
+# Disable dev tools and hot reloading for production
+app.enable_dev_tools(debug=False, dev_tools_hot_reload=False)
 
 # ===== PERFORMANCE OPTIMIZATION STARTUP =====
 def initialize_performance_optimizations():

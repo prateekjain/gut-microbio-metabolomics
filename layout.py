@@ -2,17 +2,17 @@
 import dash
 from dash import dcc, html
 import dash_bootstrap_components as dbc
-import redis
-import os
+# import redis
+# import os
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-redis_client = redis.Redis.from_url(REDIS_URL)
+# REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# redis_client = redis.Redis.from_url(REDIS_URL)
 
-try:
-    redis_client.ping()
-    print("Redis connection successful!")
-except Exception as e:
-    print(f"Redis connection failed: {e}")
+# try:
+#     redis_client.ping()
+#     print("Redis connection successful!")
+# except Exception as e:
+#     print(f"Redis connection failed: {e}")
 
 from compare_tumor.callback import register_callbacks
 from compare_tumor.data_functions import *
