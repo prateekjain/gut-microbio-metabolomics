@@ -536,18 +536,10 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 
 @memory_logger("get_multiple_bacteria_cumm_top_metabolites: Memory")
 @log_time("get_multiple_bacteria_cumm_top_metabolites: DB Query")
+@simple_redis_cache()  # Use our new Redis cache system
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
     if not selected_bacteria:
         return None
-
-    # 1. Build a cache key (sort for consistency)
-    key = f"cumm_top:{table_name}:{','.join(sorted(selected_bacteria))}"
-
-    # 2. Try Redis cache
-    cached_df = redis_cache_get(key)
-    if cached_df is not None:
-        logging.info("Loaded cumulative top metabolites from Redis cache.")
-        return cached_df
 
     # 3. Run the expensive query as before
     try:
@@ -622,10 +614,6 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
             result_df = result_df.dropna(subset=['value'])
 
             logging.info("Cumulative analysis completed. Shape: %s", result_df.shape)
-
-            # 4. Save to Redis cache
-            if result_df is not None and not result_df.empty:
-                redis_cache_set(key, result_df, ttl=3600)  # 1 hour TTL
 
             return result_df
 
@@ -1749,23 +1737,3 @@ def get_cache_info():
 # 
 # 4. Monitor query performance with EXPLAIN ANALYZE
 
-# Get Redis URL from environment
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-redis_client = redis.Redis.from_url(REDIS_URL)
-
-try:
-    redis_client.ping()
-    print("Redis connection successful!")
-except Exception as e:
-    print(f"Redis connection failed: {e}")
-
-def redis_cache_get(key):
-    value = redis_client.get(key)
-    if value is not None:
-        # Assume value is JSON-encoded DataFrame
-        return pd.read_json(value)
-    return None
-
-def redis_cache_set(key, df, ttl=3600):
-    # Store DataFrame as JSON string
-    redis_client.setex(key, ttl, df.to_json())
