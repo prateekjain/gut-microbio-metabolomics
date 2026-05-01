@@ -378,8 +378,31 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     font-weight: 600 !important;
 }
 
+/* Dash 2.17 dcc.Tabs DOM: <div class="tab-parent" flex-column> -> [.tab-container,
+   .tab-content]. Verified by reading dash/dcc/dash_core_components.js source.
+   Dash itself ships NO width rule for .tab-content — it relies on default block
+   sizing. With our cards (.form-section, .outer-container) declaring
+   `width: 100%`, that creates a circular sizing dependency: .tab-content sizes
+   to its content's intrinsic width, but the content's width references
+   .tab-content. Browsers resolve this to min-content in some contexts, which is
+   what was collapsing the Top Metabolites + Cumulative form-sections to ~400 px.
+   Set an explicit `width: 100%` here so .tab-content always fills .tab-parent. */
+.tab-parent {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    align-items: stretch !important;
+}
+.tab-container {
+    width: 100% !important;
+    align-self: stretch !important;
+}
 .dash-tab-content,
 .tab-content {
+    display: block !important;
+    width: 100% !important;
+    align-self: stretch !important;
+    box-sizing: border-box !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
