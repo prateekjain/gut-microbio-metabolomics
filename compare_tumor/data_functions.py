@@ -1448,6 +1448,8 @@ def get_dropdown_options():
 
 
 @log_time("get_gmm_name_by_type: DB Query")
+@simple_cache(max_size=20, ttl=600)
+@simple_redis_cache()
 def get_gmm_name_by_type(table_name, type_filter="all"):
     """
     Fetches metabolites filtered by type. Handles different table structures:

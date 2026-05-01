@@ -1100,6 +1100,19 @@ main_layout = dbc.Container(
                                                 [
                                                     dbc.Col(
                                                         [
+                                                            html.Label("Filter by Type:", className="select-label"),
+                                                            dbc.RadioItems(
+                                                                id="type-filter-radio-top-a",
+                                                                options=[
+                                                                    {"label": "By Name", "value": "by_name"},
+                                                                    {"label": "By Positive", "value": "by_positive"},
+                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "All Types", "value": "all"}
+                                                                ],
+                                                                value="all",
+                                                                inline=True,
+                                                                className="select-input radio-horizontal",
+                                                            ),
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-top",
@@ -1150,6 +1163,19 @@ main_layout = dbc.Container(
                                                 [
                                                     dbc.Col(
                                                         [
+                                                            html.Label("Filter by Type:", className="select-label"),
+                                                            dbc.RadioItems(
+                                                                id="type-filter-radio-top-b",
+                                                                options=[
+                                                                    {"label": "By Name", "value": "by_name"},
+                                                                    {"label": "By Positive", "value": "by_positive"},
+                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "All Types", "value": "all"}
+                                                                ],
+                                                                value="all",
+                                                                inline=True,
+                                                                className="select-input radio-horizontal",
+                                                            ),
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-top-b",
@@ -1216,6 +1242,19 @@ main_layout = dbc.Container(
                                                 [
                                                     dbc.Col(
                                                         [
+                                                            html.Label("Filter by Type:", className="select-label"),
+                                                            dbc.RadioItems(
+                                                                id="type-filter-radio-cum-a",
+                                                                options=[
+                                                                    {"label": "By Name", "value": "by_name"},
+                                                                    {"label": "By Positive", "value": "by_positive"},
+                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "All Types", "value": "all"}
+                                                                ],
+                                                                value="all",
+                                                                inline=True,
+                                                                className="select-input radio-horizontal",
+                                                            ),
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-cum-top",
@@ -1266,6 +1305,19 @@ main_layout = dbc.Container(
                                                 [
                                                     dbc.Col(
                                                         [
+                                                            html.Label("Filter by Type:", className="select-label"),
+                                                            dbc.RadioItems(
+                                                                id="type-filter-radio-cum-b",
+                                                                options=[
+                                                                    {"label": "By Name", "value": "by_name"},
+                                                                    {"label": "By Positive", "value": "by_positive"},
+                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "All Types", "value": "all"}
+                                                                ],
+                                                                value="all",
+                                                                inline=True,
+                                                                className="select-input radio-horizontal",
+                                                            ),
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-cum-top-b",

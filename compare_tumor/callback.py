@@ -739,12 +739,13 @@ def register_callbacks(app):
 
     @app.callback(
         Output("gmm-scatter-top-plot", "figure"),
-        [Input("selected-bacteria-top", "value")],
+        [Input("selected-bacteria-top", "value"),
+         Input("type-filter-radio-top-a", "value")],
     )
     @memory_logger("update_scatter_top_plot: Memory")
     @performance_logger
-    def update_scatter_top_plot(selected_bacteria):
-        logging.info(f"Triggered callback with bacteria: {selected_bacteria}")
+    def update_scatter_top_plot(selected_bacteria, type_filter):
+        logging.info(f"Triggered callback with bacteria: {selected_bacteria}, type: {type_filter}")
 
         table_name = get_table_name_from_tab("tab-a")
 
@@ -752,11 +753,11 @@ def register_callbacks(app):
             if not selected_bacteria:
                 logging.info("No bacteria selected.")
                 return create_empty_figure("No Bacteria Selected", "Please select bacteria from the dropdown to view the plot.")
-            
+
             # Fetch data for all bacteria in the top 10 metabolites
             df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria)
             logging.info(f'Top 10 df shape: {df.shape if df is not None else "None"}')
-            
+
             # Handle edge cases
             if df is None or df.empty:
                 logging.warning("No data available for scatter plot.")
@@ -765,6 +766,10 @@ def register_callbacks(app):
             # Filter the DataFrame to include only the selected bacteria
             if selected_bacteria:
                 df = df[df["bacteria"].isin(selected_bacteria)]
+
+            if type_filter and type_filter != "all":
+                allowed = set(get_gmm_name_by_type(table_name, type_filter))
+                df = df[df["metabolite"].isin(allowed)]
 
             if df.empty:
                 logging.info("Selected bacteria do not meet the conditions.")
@@ -788,19 +793,20 @@ def register_callbacks(app):
     
     @app.callback(
         Output("gmm-scatter-cumm-top-plot", "figure"),
-        [Input("selected-bacteria-cum-top", "value")],
+        [Input("selected-bacteria-cum-top", "value"),
+         Input("type-filter-radio-cum-a", "value")],
     )
     @memory_logger("update_scatter_top_plot_cumm: Memory")
     @performance_logger
-    def update_scatter_top_plot(selected_bacteria):
-        logging.info(f"Triggered callback with bacteria: {selected_bacteria}")
+    def update_scatter_top_plot(selected_bacteria, type_filter):
+        logging.info(f"Triggered callback with bacteria: {selected_bacteria}, type: {type_filter}")
         table_name = get_table_name_from_tab("tab-a")
 
         try:
             # Check for minimum 2 bacteria selection
             if not selected_bacteria or len(selected_bacteria) < 2:
                 return create_empty_figure(
-                    "Insufficient Selection", 
+                    "Insufficient Selection",
                     "Please select at least 2 bacteria to compare their collective presence in top producers."
                 )
 
@@ -808,9 +814,18 @@ def register_callbacks(app):
 
             if df is None or df.empty:
                 return create_empty_figure(
-                    "No Matching Data", 
+                    "No Matching Data",
                     f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite."
                 )
+
+            if type_filter and type_filter != "all":
+                allowed = set(get_gmm_name_by_type(table_name, type_filter))
+                df = df[df["metabolite"].isin(allowed)]
+                if df.empty:
+                    return create_empty_figure(
+                        "No Matching Data",
+                        "No metabolites match the selected type filter."
+                    )
 
             # Use the optimized plotting function from dynamicPlots.py
             from compare_tumor.dynamicPlots import create_dynamic_scatter_plot
@@ -1268,12 +1283,13 @@ def register_callbacks(app):
     # Callback for In Vivo Top Metabolites Analysis
     @app.callback(
         Output("gmm-scatter-top-plot-b", "figure"),
-        [Input("selected-bacteria-top-b", "value")],
+        [Input("selected-bacteria-top-b", "value"),
+         Input("type-filter-radio-top-b", "value")],
     )
     @memory_logger("update_scatter_top_plot_b: Memory")
     @performance_logger
-    def update_scatter_top_plot_b(selected_bacteria):
-        logging.info(f"Triggered In Vivo top metabolites callback with bacteria: {selected_bacteria}")
+    def update_scatter_top_plot_b(selected_bacteria, type_filter):
+        logging.info(f"Triggered In Vivo top metabolites callback with bacteria: {selected_bacteria}, type: {type_filter}")
 
         table_name = "in_vivo"  # Use in_vivo table
 
@@ -1281,7 +1297,7 @@ def register_callbacks(app):
             if not selected_bacteria:
                 logging.info("No bacteria selected for In Vivo top metabolites.")
                 return create_empty_figure("No Bacteria Selected", "Please select bacteria from the dropdown to view the plot.")
-            
+
             # Fetch data for all bacteria in the top 10 metabolites
             df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria)
             logging.info(f'In Vivo top 10 df shape: {df.shape if df is not None else "None"}')
@@ -1293,7 +1309,11 @@ def register_callbacks(app):
             # Filter the DataFrame to include only the selected bacteria
             if selected_bacteria:
                 df = df[df["bacteria"].isin(selected_bacteria)]
-            
+
+            if type_filter and type_filter != "all":
+                allowed = set(get_gmm_name_by_type(table_name, type_filter))
+                df = df[df["metabolite"].isin(allowed)]
+
             if df.empty:
                 return create_empty_figure(
                     "No Data Available for Selected Bacteria",
@@ -1318,20 +1338,21 @@ def register_callbacks(app):
     # Callback for In Vivo Cumulative Top Metabolites Analysis
     @app.callback(
         Output("gmm-scatter-cumm-top-plot-b", "figure"),
-        [Input("selected-bacteria-cum-top-b", "value")],
+        [Input("selected-bacteria-cum-top-b", "value"),
+         Input("type-filter-radio-cum-b", "value")],
     )
     @memory_logger("update_scatter_cumm_top_plot_b: Memory")
     @performance_logger
-    def update_scatter_cumm_top_plot_b(selected_bacteria):
-        logging.info(f"Triggered In Vivo cumulative top metabolites callback with bacteria: {selected_bacteria}")
-        
+    def update_scatter_cumm_top_plot_b(selected_bacteria, type_filter):
+        logging.info(f"Triggered In Vivo cumulative top metabolites callback with bacteria: {selected_bacteria}, type: {type_filter}")
+
         table_name = "in_vivo"  # Use in_vivo table
 
         try:
             # Check for minimum 2 bacteria selection
             if not selected_bacteria or len(selected_bacteria) < 2:
                 return create_empty_figure(
-                    "Insufficient Selection", 
+                    "Insufficient Selection",
                     "Please select at least 2 bacteria to compare their collective presence in top producers."
                 )
 
@@ -1339,9 +1360,18 @@ def register_callbacks(app):
 
             if df is None or df.empty:
                 return create_empty_figure(
-                    "No Matching Data", 
+                    "No Matching Data",
                     f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite."
                 )
+
+            if type_filter and type_filter != "all":
+                allowed = set(get_gmm_name_by_type(table_name, type_filter))
+                df = df[df["metabolite"].isin(allowed)]
+                if df.empty:
+                    return create_empty_figure(
+                        "No Matching Data",
+                        "No metabolites match the selected type filter."
+                    )
 
             # Use the optimized plotting function from dynamicPlots.py
             from compare_tumor.dynamicPlots import create_dynamic_scatter_plot
