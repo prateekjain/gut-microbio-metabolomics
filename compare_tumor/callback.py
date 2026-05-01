@@ -973,27 +973,32 @@ def register_callbacks(app):
 
         # Create heatmap
         try:
-            fig = go.Figure(data=go.Heatmap(
-                z=heatmap_data.values,  # Heatmap values
-                x=heatmap_data.columns,  # Metabolites
-                y=heatmap_data.index,    # Bacteria, including "Net Balance"
-                colorscale='RdYlGn', # Spectral
-                colorbar=dict(title="Value"),
-                text=heatmap_data.values,  # Add the cell values
-                texttemplate="%{text:.2f}",  # Format text to show two decimal places
-                textfont={"size": 10},  # Adjust text font size
-            ))
-
-            # Calculate dynamic dimensions based on data size
             num_metabolites = len(heatmap_data.columns)
             num_bacteria = len(heatmap_data.index)
-            
+            # Only annotate cells when the matrix is small enough that the text is readable.
+            # Above this threshold, in-cell labels just bloat the payload (was producing 15+ MB JSON).
+            show_cell_text = (num_metabolites * num_bacteria) <= 400
+
+            heatmap_kwargs = dict(
+                z=heatmap_data.values,
+                x=heatmap_data.columns,
+                y=heatmap_data.index,
+                colorscale='RdYlGn',
+                colorbar=dict(title="Value"),
+            )
+            if show_cell_text:
+                heatmap_kwargs.update(
+                    text=heatmap_data.values,
+                    texttemplate="%{text:.2f}",
+                    textfont={"size": 10},
+                )
+
+            fig = go.Figure(data=go.Heatmap(**heatmap_kwargs))
+
             # Dynamic width calculation (minimum 800px, 60px per metabolite)
             plot_width = max(800, num_metabolites * 60)
             # Dynamic height calculation (minimum 600px, 40px per bacteria)
             plot_height = max(600, num_bacteria * 40)
-            
-            print(f"[DEBUG] In Vitro Plot dimensions: {plot_width}x{plot_height} for {num_metabolites} metabolites x {num_bacteria} bacteria")
 
             # Update layout with responsive sizing
             fig.update_layout(
@@ -1066,27 +1071,31 @@ def register_callbacks(app):
 
         # Create heatmap
         try:
-            fig = go.Figure(data=go.Heatmap(
-                z=heatmap_data.values,  # Heatmap values
-                x=heatmap_data.columns,  # Metabolites (X-axis)
-                y=heatmap_data.index,    # Bacteria (Y-axis), including "Net Balance"
-                colorscale='RdYlGn',
-                colorbar=dict(title="Value"),
-                text=heatmap_data.values,  # Add the cell values
-                texttemplate="%{text:.2f}",  # Format text to show two decimal places
-                textfont={"size": 10},  # Adjust text font size
-            ))
-
-            # Calculate dynamic dimensions based on data size
             num_metabolites = len(heatmap_data.columns)
             num_bacteria = len(heatmap_data.index)
-            
+            # Skip cell-level text for big matrices — see In Vitro callback above for rationale.
+            show_cell_text = (num_metabolites * num_bacteria) <= 400
+
+            heatmap_kwargs = dict(
+                z=heatmap_data.values,
+                x=heatmap_data.columns,
+                y=heatmap_data.index,
+                colorscale='RdYlGn',
+                colorbar=dict(title="Value"),
+            )
+            if show_cell_text:
+                heatmap_kwargs.update(
+                    text=heatmap_data.values,
+                    texttemplate="%{text:.2f}",
+                    textfont={"size": 10},
+                )
+
+            fig = go.Figure(data=go.Heatmap(**heatmap_kwargs))
+
             # Dynamic width calculation (minimum 800px, 60px per metabolite)
             plot_width = max(800, num_metabolites * 60)
             # Dynamic height calculation (minimum 600px, 40px per bacteria)
             plot_height = max(600, num_bacteria * 40)
-            
-            print(f"[DEBUG] Plot dimensions: {plot_width}x{plot_height} for {num_metabolites} metabolites x {num_bacteria} bacteria")
 
             # Update layout with responsive sizing
             fig.update_layout(

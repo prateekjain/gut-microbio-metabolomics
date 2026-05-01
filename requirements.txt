@@ -36,12 +36,8 @@ tzdata==2023.4
 urllib3==2.2.0
 Werkzeug==3.0.1
 zipp==3.17.0
-opencv-contrib-python==4.8.0.74
-opencv-python==4.8.0.74
 matplotlib
 matplotlib-inline
-imageio==2.31.1
-image==1.5.33
 Pillow>=10.2.0
 joblib==1.4.2
 redis==5.0.4

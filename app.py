@@ -2,10 +2,12 @@ import dash
 from dash import dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output
+from flask import redirect, request
 from compare_tumor.callback import register_callbacks
 from layout import main_layout
 from layout404 import main_layout404
 import logging
+import threading
 import time
 import redis
 import os
@@ -55,8 +57,11 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
 app.title = 'Gut Microbio Metabolomics'
 server = app.server
 
-# Disable dev tools and hot reloading for production
-app.enable_dev_tools(debug=False, dev_tools_hot_reload=False)
+
+@server.before_request
+def _root_to_yale():
+    if request.path == '/':
+        return redirect('/yale-university', code=302)
 
 # ===== PERFORMANCE OPTIMIZATION STARTUP =====
 def initialize_performance_optimizations():
@@ -127,8 +132,8 @@ def get_redis_status():
         logger.error(f"Failed to get Redis status: {e}")
         return None
 
-# Initialize optimizations on startup
-initialize_performance_optimizations()
+# Run warm-up off the boot path so the dyno binds to the port immediately
+threading.Thread(target=initialize_performance_optimizations, daemon=True).start()
 
 
 app.layout = html.Div([
@@ -141,11 +146,7 @@ app.layout = html.Div([
 def display_page(pathname):
     if pathname == '/yale-university':
         return main_layout
-    elif pathname == '/':
-        # Redirect to '/yale-university' when visiting '/'
-        return dcc.Location(pathname='/yale-university', id='redirect')
-    else:
-        return main_layout404
+    return main_layout404
 
 register_callbacks(app)
 

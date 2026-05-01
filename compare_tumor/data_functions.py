@@ -349,37 +349,33 @@ def get_all_columns_data(table_name, selected_compound):
 
     try:
         with get_db_connection() as cursor:
-            # Fetch column names
-            cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
-            columns = [desc[0] for desc in cursor.description]
-            logging.info("Columns fetched: %s", columns)
-
-            # Ensure 'name' column exists
-            if 'name' not in columns:
+            cursor.execute(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = %s
+                  AND column_name NOT IN ('mz', 'rt', 'list_2_match')
+                ORDER BY ordinal_position
+                """,
+                (table_name,),
+            )
+            cols = [r[0] for r in cursor.fetchall()]
+            if not cols:
+                logging.error("Table '%s' has no columns or does not exist", table_name)
+                return None
+            if 'name' not in cols:
                 logging.error("'name' column not found in table: %s", table_name)
                 return None
 
-            # Fetch all rows for the selected compound
-            query = f"SELECT * FROM {table_name} WHERE name = %s"
-            cursor.execute(query, (selected_compound,))
+            quoted = ', '.join(f'"{c}"' for c in cols)
+            cursor.execute(f"SELECT {quoted} FROM {table_name} WHERE name = %s", (selected_compound,))
             data = cursor.fetchall()
 
             if not data:
                 logging.warning("No data found for compound: %s", selected_compound)
                 return None
 
-            logging.info("Data fetched successfully for compound: %s", selected_compound)
-
-            # Create DataFrame
-            df = pd.DataFrame(data, columns=columns)
-            columns_to_exclude = ['mz', 'rt', 'list_2_match']
-            df = df.drop(columns=columns_to_exclude, errors='ignore')
-            logging.info("DataFrame created successfully for compound: %s", selected_compound)
-            
-            # Remove duplicate rows
-            df = df.drop_duplicates()
-            logging.info("Duplicate rows removed, resulting DataFrame shape: %s", df.shape)
-
+            df = pd.DataFrame(data, columns=cols).drop_duplicates()
+            logging.info("DataFrame for compound %s shape: %s", selected_compound, df.shape)
             return df
 
     except Exception as e:
@@ -403,34 +399,33 @@ def get_all_columns_data_all_compounds(table_name):
         pd.DataFrame: DataFrame containing all rows and columns.
     """
     logging.info("Fetching data from table: %s", table_name)
-    print(f"Fetching data from table: {table_name}")  # Debug log
 
     try:
         with get_db_connection() as cursor:
-            # Fetch all data
-            query = f"SELECT * FROM {table_name}"
-            cursor.execute(query)
+            cursor.execute(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = %s
+                  AND column_name NOT IN ('mz', 'rt', 'list_2_match')
+                ORDER BY ordinal_position
+                """,
+                (table_name,),
+            )
+            cols = [r[0] for r in cursor.fetchall()]
+            if not cols:
+                logging.error("Table '%s' has no columns or does not exist", table_name)
+                return None
+
+            quoted = ', '.join(f'"{c}"' for c in cols)
+            cursor.execute(f"SELECT {quoted} FROM {table_name}")
             data = cursor.fetchall()
 
-            # Get column names
-            columns = [desc[0] for desc in cursor.description]
-            logging.info("Columns fetched: %s", columns)
-
-            # Create DataFrame
-            df = pd.DataFrame(data, columns=columns)
-            columns_to_exclude = ['mz', 'rt', 'list_2_match']
-            df = df.drop(columns=columns_to_exclude, errors='ignore')
-            logging.info("DataFrame created successfully for the table: %s", table_name)
-
-            # Drop duplicates if any
-            df = df.drop_duplicates()
-            print(f"DataFrame shape after processing: {df.shape}")  # More efficient debug log
-
+            df = pd.DataFrame(data, columns=cols).drop_duplicates()
+            logging.info("Table %s shape: %s", table_name, df.shape)
             return df
 
     except Exception as e:
         logging.error("Error fetching data: %s", e)
-        print(f"Error fetching data: {e}")  # Debug log
         return None
 
 
@@ -1045,42 +1040,23 @@ def get_q05_mz_values(region):
 
 @simple_cache(max_size=2, ttl=1800)
 def get_q05_mz_forest_values():
+    """mz values where exactly one region's Pvalue is significant (<= 0.05)."""
     try:
-        # Establish a connection to the database
         with get_db_connection() as cursor:
-            # List of columns to be selected based on the condition
-            columns = ["mz"]
-
-            # List of regions
-            regions = ["cecum", "ascending", "transverse",
-                    "descending", "sigmoid", "rectosigmoid", "rectum"]
-            values = []
-
-            # Construct the query for each region separately
-            for reg in regions:
-                # Construct the column name for the current region's Pvalue column
-                pvalue_column = f"Pvalue_{reg}"
-
-                # Construct the query to select distinct mz values where q_fdr <= 0.05 for the current region
-                query = f"SELECT DISTINCT mz FROM forest_plot WHERE {pvalue_column} <= 0.05"
-                # Add conditions for other regions
-                for other_reg in regions:
-                    if other_reg != reg:
-                        other_pvalue_column = f"Pvalue_{other_reg}"
-                        query += f" AND {other_pvalue_column} > 0.05"
-
-                # Execute the query
-                cursor.execute(query)
-                columns.append(pvalue_column)
-                # Fetch all the rows and extract the mz values
-                q05_mz_values = {row[0] for row in cursor.fetchall()}
-                # print("q05_mz_values", list(q05_mz_values))
-                # print("\n")
-                values.extend(list(q05_mz_values))
-                # print("values", values)
-
-            values = sorted(values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
-            return values
+            cursor.execute("""
+                SELECT DISTINCT mz FROM forest_plot
+                WHERE (
+                    (CASE WHEN pvalue_cecum         <= 0.05 THEN 1 ELSE 0 END) +
+                    (CASE WHEN pvalue_ascending    <= 0.05 THEN 1 ELSE 0 END) +
+                    (CASE WHEN pvalue_transverse   <= 0.05 THEN 1 ELSE 0 END) +
+                    (CASE WHEN pvalue_descending   <= 0.05 THEN 1 ELSE 0 END) +
+                    (CASE WHEN pvalue_sigmoid      <= 0.05 THEN 1 ELSE 0 END) +
+                    (CASE WHEN pvalue_rectosigmoid <= 0.05 THEN 1 ELSE 0 END) +
+                    (CASE WHEN pvalue_rectum       <= 0.05 THEN 1 ELSE 0 END)
+                ) = 1
+            """)
+            values = [row[0] for row in cursor.fetchall()]
+            return sorted(values, key=lambda s: str(s).casefold() if isinstance(s, str) else s)
     except Exception as e:
         logging.error(f"Error getting q05 mz forest values: {e}")
         return []
