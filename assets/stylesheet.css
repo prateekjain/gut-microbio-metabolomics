@@ -591,10 +591,22 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
        figures set their own height (520 px in dynamicPlots) once data lands. */
     min-height: 280px;
     max-height: 760px;
-    display: flex;
-    align-items: stretch;
-    justify-content: stretch;
+    /* Block layout: scatter figures use autosize and naturally fit the container
+       width. The previous `display:flex; justify-content:stretch` was a no-op
+       (stretch is not valid for justify-content) — it fell back to flex-start
+       and pinned the empty-state figure to the left edge instead of centering
+       its annotation. Plotly's own paper-coord centering then placed the
+       message off-center inside its smaller-than-container figure box. */
+    display: block;
     position: relative;
+}
+/* Plotly's outer wrapper inside the container should fill width so that
+   `paper`-anchored annotations land in the visual center. */
+.scatter-container > div,
+.scatter-container-top > div,
+.scatter-container > .js-plotly-plot,
+.scatter-container-top > .js-plotly-plot {
+    width: 100% !important;
 }
 .scatter-container-heat {
     background: var(--bg-card-quiet);
