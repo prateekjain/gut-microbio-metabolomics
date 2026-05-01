@@ -515,11 +515,20 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
             # Create DataFrame with optimized memory usage
             columns = ['metabolite', 'bacteria', 'value', 'rank']
             df = pd.DataFrame(data, columns=columns)
-            
+
             # Convert value to numeric efficiently
             df['value'] = pd.to_numeric(df['value'], errors='coerce')
             df = df.dropna(subset=['value'])
-            
+
+            # The SQL ranks per-metabolite among only the SELECTED bacteria, so
+            # rank<=10 lets through every metabolite when <=10 bacteria are picked.
+            # Cap to the 50 metabolites with the highest peak value so the chart
+            # stays readable and the response stays small (was ~2.3 MB / 40k+ points).
+            top_metabolites = (
+                df.groupby('metabolite')['value'].max().nlargest(50).index
+            )
+            df = df[df['metabolite'].isin(top_metabolites)].reset_index(drop=True)
+
             logging.info("Data fetched successfully. Shape: %s", df.shape)
             return df
 
@@ -604,10 +613,17 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
             # Create DataFrame with optimized memory usage
             columns = ['metabolite', 'bacteria', 'value', 'rank']
             result_df = pd.DataFrame(data, columns=columns)
-            
+
             # Convert value to numeric efficiently
             result_df['value'] = pd.to_numeric(result_df['value'], errors='coerce')
             result_df = result_df.dropna(subset=['value'])
+
+            # Cap to top-50 metabolites by peak value — see get_multiple_bacteria_top_metabolites
+            # for rationale. Without this the response is ~2.3 MB and the chart wobbles.
+            top_metabolites = (
+                result_df.groupby('metabolite')['value'].max().nlargest(50).index
+            )
+            result_df = result_df[result_df['metabolite'].isin(top_metabolites)].reset_index(drop=True)
 
             logging.info("Cumulative analysis completed. Shape: %s", result_df.shape)
 

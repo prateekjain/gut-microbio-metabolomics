@@ -661,11 +661,13 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
         x_title = "Metabolite"
         title = title or f"Values for Bacteria"
 
-    # Dynamic sizing based on data
+    # Number of unique x-values drives marker size + tick density. Width/height
+    # are NOT hard-coded — let dcc.Graph(config={'responsive': True}) and the
+    # container's CSS govern layout. Hard-coding caused the chart to render at
+    # 1400x800 regardless of viewport, overflowing the container and reflowing
+    # the page on every callback update ("wobble").
     num_points = len(x_axis.unique())
-    scatter_width = max(800, min(1400, num_points * 25))
-    scatter_height = max(500, min(800, 400 + num_points * 5))
-    
+
     # Create optimized scatter plot
     fig = go.Figure()
     
@@ -727,11 +729,14 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
             gridcolor='rgba(128, 128, 128, 0.2)'
         ),
         template="plotly_white",
-        width=scatter_width,
-        height=scatter_height,
+        autosize=True,
+        height=520,
         margin=dict(l=80, r=60, b=120, t=80, pad=4),
         plot_bgcolor='white',
-        paper_bgcolor='white'
+        paper_bgcolor='white',
+        # uirevision keeps user zoom/pan state stable across callback updates so the
+        # chart doesn't visually re-layout from scratch every render.
+        uirevision='cumm-top-plot',
     )
 
     return fig
