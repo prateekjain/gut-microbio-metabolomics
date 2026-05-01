@@ -397,6 +397,7 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     border-radius: var(--radius-lg);
     padding: 2rem 2rem 2.25rem;
     margin: 1.5rem auto;
+    width: 100%;                       /* fill parent inside flex/loading wrappers */
     max-width: var(--maxw-content);
     box-shadow: var(--shadow-soft);
 }
@@ -541,6 +542,8 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     margin: 1.5rem auto;
+    width: 100%;                       /* dcc.Loading uses display:flex inline; without
+                                          this, .outer-container collapses to content */
     max-width: var(--maxw-wide);
     box-shadow: var(--shadow-soft);
 }
@@ -560,11 +563,14 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
-    min-height: 460px;
+    /* min-height kept low for the empty-state and "no selection" placeholders so
+       the form section doesn't reserve a 600 px void above the fold. Plotly
+       figures set their own height (520 px in dynamicPlots) once data lands. */
+    min-height: 280px;
     max-height: 760px;
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
+    align-items: stretch;
+    justify-content: stretch;
     position: relative;
 }
 .scatter-container-heat {
@@ -575,7 +581,7 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     margin: 0.75rem auto;
     width: 100%;
     max-width: 100%;
-    min-height: 560px;
+    min-height: 320px;
     max-height: 85vh;
     height: auto;
     overflow: auto;
@@ -600,11 +606,16 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
 /* -----------------------------------------------------------------------------
    10. DASH LOADING
    --------------------------------------------------------------------------*/
-.loading-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 200px;
+/* dcc.Loading attaches an inline style {display:flex; alignItems:center; ...} which
+   collapses non-flex children (.outer-container etc.) to their content. Override
+   with !important so children that say `width: 100%` actually get full width. */
+.loading-wrapper,
+[id^="loading-"] {
+    display: block !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    min-height: 0 !important;
+    width: 100% !important;
 }
 .dash-loading,
 ._dash-loading,
@@ -635,28 +646,51 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
 .menu-section h2 {
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: 1.05rem;
-    letter-spacing: 0.01em;
-    color: #ffffff;
-    margin-bottom: 0.85rem;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.96);
+    margin: 0 0 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
-.menu-section ul { list-style: none; padding: 0; margin: 0; }
-.menu-section li { margin-bottom: 0.5rem; }
+.menu-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    /* Spread links across 2-3 columns instead of one tall stack. auto-fit + minmax
+       collapses to a single column on narrow viewports automatically. */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.25rem 2rem;
+}
+.menu-section li { margin: 0; }
 .menu-section a {
-    color: rgba(255, 255, 255, 0.78);
+    color: rgba(255, 255, 255, 0.8);
     font-size: 0.92rem;
     font-weight: 400;
-    padding: 0.35rem 0;
-    display: inline-block;
-    transition: color var(--t-fast) var(--ease), padding-left var(--t-fast) var(--ease);
+    padding: 0.4rem 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color var(--t-fast) var(--ease), gap var(--t-fast) var(--ease);
     text-decoration: none;
-    border-bottom: 1px solid transparent;
+}
+.menu-section a::before {
+    content: "›";
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 1.1em;
+    line-height: 1;
+    transition: color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 .menu-section a:hover {
     color: #ffffff;
     text-decoration: none;
-    padding-left: 4px;
-    border-bottom-color: rgba(255, 255, 255, 0.4);
+    gap: 0.7rem;
+}
+.menu-section a:hover::before {
+    color: var(--yale-blue-300);
+    transform: translateX(2px);
 }
 .copyright {
     text-align: center;
