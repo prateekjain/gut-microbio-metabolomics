@@ -168,21 +168,30 @@ def register_callbacks(app):
     # Pre-populating dropdowns at layout-import time bloated main_layout to ~15 MB
     # and caused H27 client timeouts. Each dropdown below is initialized via a
     # callback fired after the layout mounts, so the initial response stays small.
-    def _register_dropdown_init(dropdown_id, fetcher, single=True, max_items=2000):
-        @app.callback(
-            [Output(dropdown_id, "options"), Output(dropdown_id, "value")],
-            Input("url", "pathname"),
-        )
+    #
+    # Some dropdowns have their `.value` already driven by an existing circular
+    # callback (e.g. selected-bacteria-gmm-a/b are outputs of the gmm-scatter
+    # callbacks at the top of this file). For those we set options ONLY — Dash
+    # forbids two callbacks producing the same output and will refuse to start
+    # the renderer if we duplicate.
+    def _register_dropdown_init(dropdown_id, fetcher, single=True, max_items=2000, set_value=True):
+        outputs = [Output(dropdown_id, "options")]
+        if set_value:
+            outputs.append(Output(dropdown_id, "value"))
+
+        @app.callback(outputs, Input("url", "pathname"))
         def _init(_):
             try:
                 vals = list(fetcher() or [])[:max_items]
                 options = [{"label": v, "value": v} for v in vals]
-                if single:
-                    return options, (options[0]["value"] if options else None)
-                return options, []
             except Exception as exc:
-                logging.error(f"Failed to init dropdown {dropdown_id}: {exc}")
-                return [], (None if single else [])
+                logging.error("Failed to init dropdown %s: %s", dropdown_id, exc)
+                options = []
+            if not set_value:
+                return options
+            if single:
+                return options, (options[0]["value"] if options else None)
+            return options, []
 
     _register_dropdown_init("compound-dropdown",                     lambda: get_mz_values("ascending"))
     _register_dropdown_init("compound-dropdown-mz-plus",             lambda: get_mz_values("ascending_m_plus_h"))
@@ -191,8 +200,10 @@ def register_callbacks(app):
     _register_dropdown_init("compound-dropdown-forest",              lambda: get_mz_values("forest_plot"))
     _register_dropdown_init("compound-dropdown-forest-specific",     lambda: get_q05_mz_forest_values())
     _register_dropdown_init("compound-dropdown-forest-rcc-lcc",      lambda: get_mz_values("forest_rcc_lcc_plot"))
-    _register_dropdown_init("selected-bacteria-gmm-a",               lambda: get_column_names("gmm_test_1"))
-    _register_dropdown_init("selected-bacteria-gmm-b",               lambda: get_column_names("in_vivo"))
+    # selected-bacteria-gmm-{a,b}.value are already outputs of the gmm-scatter callbacks
+    # (lines registering Output("selected-bacteria-gmm-a", "value") and "...gmm-b"). Set options only.
+    _register_dropdown_init("selected-bacteria-gmm-a",               lambda: get_column_names("gmm_test_1"), set_value=False)
+    _register_dropdown_init("selected-bacteria-gmm-b",               lambda: get_column_names("in_vivo"),    set_value=False)
     _register_dropdown_init("selected-metabolites",                  lambda: get_column_names("gmm_test_1"), single=False)
     _register_dropdown_init("selected-bacteria-heatmap-b",           lambda: get_column_names("in_vivo"),    single=False)
     _register_dropdown_init("selected-bacteria-top",                 lambda: get_column_names("gmm_test_1"), single=False)

@@ -3,6 +3,7 @@ from dash import dcc, html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output
 from flask import redirect, request
+from flask_compress import Compress
 from compare_tumor.callback import register_callbacks
 from layout import main_layout
 from layout404 import main_layout404
@@ -56,6 +57,11 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets,
                 suppress_callback_exceptions=True)
 app.title = 'Gut Microbio Metabolomics'
 server = app.server
+
+# Gzip Flask responses (incl. Dash's JS bundles, /_dash-layout, callback JSON).
+# Heroku's router does NOT auto-compress; without this the 3.6 MB plotly.min.js
+# transfers uncompressed and takes 30-40s on slow links.
+Compress(server)
 
 
 @server.before_request
