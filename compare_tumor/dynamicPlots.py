@@ -630,20 +630,29 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
         Plotly figure
     """
     if data is None or data.empty:
-        # Create simple empty figure
+        # Empty state: title + message centered, no axes/grid leaking through.
         fig = go.Figure()
         fig.update_layout(
-            title="No Data",
-            annotations=[{
-                'text': "No data available for selection",
-                'xref': "paper",
-                'yref': "paper",
-                'showarrow': False,
-                'font': {'size': 16},
-                'x': 0.5,
-                'y': 0.5,
-            }],
             template="plotly_white",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=24, r=24, t=24, b=24),
+            height=280,
+            xaxis=dict(visible=False, showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(visible=False, showgrid=False, zeroline=False, showticklabels=False),
+            annotations=[
+                dict(text="<b>No Data</b>", xref="paper", yref="paper",
+                     x=0.5, y=0.62, xanchor="center", yanchor="bottom",
+                     showarrow=False,
+                     font=dict(size=18, color="#0f1722",
+                               family="Source Serif 4, Georgia, serif")),
+                dict(text="No data available for the current selection.",
+                     xref="paper", yref="paper",
+                     x=0.5, y=0.5, xanchor="center", yanchor="top",
+                     showarrow=False,
+                     font=dict(size=14, color="#6b7280",
+                               family="Inter, system-ui, sans-serif")),
+            ],
         )
         return fig
     

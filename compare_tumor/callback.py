@@ -828,22 +828,36 @@ def register_callbacks(app):
             return create_empty_figure("Error", str(e))
 
     def create_empty_figure(title, message):
-        """Helper function to create empty figure with message"""
+        """Empty-state figure: title above a centered message, no axes/grid.
+        Previously the default Plotly axes (-1..6, 0..4) bled through under the
+        annotation, making the message look broken."""
         fig = go.Figure()
         fig.update_layout(
-            title=title,
+            template="plotly_white",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=24, r=24, t=24, b=24),
+            height=280,
+            xaxis=dict(visible=False, showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(visible=False, showgrid=False, zeroline=False, showticklabels=False),
             annotations=[
                 dict(
-                    text=message,
-                    xref="paper",
-                    yref="paper",
+                    text=f"<b>{title}</b>",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.62,
+                    xanchor="center", yanchor="bottom",
                     showarrow=False,
-                    font=dict(size=16),
-                    x=0.5,
-                    y=0.5,
-                )
+                    font=dict(size=18, color="#0f1722", family="Source Serif 4, Georgia, serif"),
+                ),
+                dict(
+                    text=message,
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    xanchor="center", yanchor="top",
+                    showarrow=False,
+                    font=dict(size=14, color="#6b7280", family="Inter, system-ui, sans-serif"),
+                ),
             ],
-            template="plotly_white",
         )
         return fig
     
