@@ -13,17 +13,14 @@ import time
 import redis
 import os
 
-# Redis configuration - Redis Cloud for production, localhost for development
+# Redis configuration - Redis Cloud for production, localhost for development.
+# We don't ping at import time: the worker process is occasionally created before
+# Heroku finishes wiring the network namespace, so the ping resolves DNS too early
+# and logs a noisy "Error -2: Name or service not known" warning even though
+# subsequent operations succeed within seconds. simple_redis_cache handles
+# transient failures via its memory-cache fallback.
 REDIS_URL = os.getenv("REDISCLOUD_URL", "redis://localhost:6379/0")
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=False, socket_connect_timeout=5, socket_timeout=5)
-
-try:
-    redis_client.ping()
-    print("Redis connection successful!")
-    print(f"Connected to Redis at: {REDIS_URL.split('@')[-1] if '@' in REDIS_URL else 'localhost'}")
-except Exception as e:
-    print(f"Redis connection failed: {e}")
-    print("Falling back to in-memory caching only")
 
 # Initialize simple Redis cache system
 from compare_tumor.simple_redis_cache import initialize_simple_redis_cache

@@ -5,11 +5,9 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
-import forestplot as fp
 import io
 import base64
 import pandas as pd
-import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 from PIL import Image
