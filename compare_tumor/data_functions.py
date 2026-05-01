@@ -522,10 +522,10 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 
             # The SQL ranks per-metabolite among only the SELECTED bacteria, so
             # rank<=10 lets through every metabolite when <=10 bacteria are picked.
-            # Cap to the 50 metabolites with the highest peak value so the chart
-            # stays readable and the response stays small (was ~2.3 MB / 40k+ points).
+            # Cap to the 10 metabolites with the highest peak value to match the
+            # "Top 10 Metabolites" plot title.
             top_metabolites = (
-                df.groupby('metabolite')['value'].max().nlargest(50).index
+                df.groupby('metabolite')['value'].max().nlargest(10).index
             )
             df = df[df['metabolite'].isin(top_metabolites)].reset_index(drop=True)
 
