@@ -175,9 +175,13 @@ def register_callbacks(app):
     # forbids two callbacks producing the same output and will refuse to start
     # the renderer if we duplicate.
     def _register_dropdown_init(dropdown_id, fetcher, single=True, max_items=2000, set_value=True):
-        outputs = [Output(dropdown_id, "options")]
+        # Dash treats `outputs=[Output(...)]` (length-1 list) as a multi-output callback
+        # that expects a list return. Keep the single-Output path bare so a plain list of
+        # options is the right return shape.
         if set_value:
-            outputs.append(Output(dropdown_id, "value"))
+            outputs = [Output(dropdown_id, "options"), Output(dropdown_id, "value")]
+        else:
+            outputs = Output(dropdown_id, "options")
 
         @app.callback(outputs, Input("url", "pathname"))
         def _init(_):
