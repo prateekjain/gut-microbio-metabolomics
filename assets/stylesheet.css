@@ -608,14 +608,30 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
    --------------------------------------------------------------------------*/
 /* dcc.Loading attaches an inline style {display:flex; alignItems:center; ...} which
    collapses non-flex children (.outer-container etc.) to their content. Override
-   with !important so children that say `width: 100%` actually get full width. */
+   with !important so children that say `width: 100%` actually get full width.
+   Match every Loading wrapper variant we use — `.loading-wrapper` (set by
+   create_loading_wrapper) plus the raw dcc.Loading instances whose IDs contain
+   "loading" (e.g. outer-container-plus-loading-scatter-top). */
 .loading-wrapper,
-[id^="loading-"] {
+[id*="loading"] {
     display: block !important;
     align-items: stretch !important;
     justify-content: stretch !important;
     min-height: 0 !important;
     width: 100% !important;
+}
+
+/* Belt-and-suspenders: anywhere our cards or section containers might be inside a
+   flex parent (Dash's tab content panel, dcc.Loading, etc.), force them to the
+   full content width. The previous CSS relied on default block behavior which
+   was being overridden in some tab branches. */
+.form-section,
+.outer-container,
+.section-spacing,
+.main-section {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    align-self: stretch !important;
 }
 .dash-loading,
 ._dash-loading,
