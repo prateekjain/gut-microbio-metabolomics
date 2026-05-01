@@ -75,16 +75,12 @@ tabs_mz = dcc.Tabs(
                                     ),
                                     dcc.Dropdown(
                                         id="compound-dropdown",
-                                        options=[
-                                            {"label": mz, "value": mz}
-                                            for mz in get_mz_values("ascending")
-                                        ],
+                                        options=[],
                                         placeholder="Select Mz Value",
                                         searchable=True,
                                         multi=False,
                                         style={"width": "100%"},
                                         className="select-input",
-                                        value=get_mz_values("ascending")[0],
                                     ),
                                     html.Div(
                                         id="selected-mz-h-value",
@@ -165,17 +161,12 @@ tabs_mz = dcc.Tabs(
                                 ),
                                 dcc.Dropdown(
                                     id="compound-dropdown-mz-plus",
-                                    options=[
-                                        {"label": mz, "value": mz}
-                                        for mz in get_mz_values("ascending_m_plus_h")
-                                    ],
+                                    options=[],
                                     placeholder="Select M+H Value",
                                     searchable=True,
                                     multi=False,
                                     style={"width": "100%"},
                                     className="select-input",
-                                    value=get_mz_values(
-                                        "ascending_m_plus_h")[0],
                                 ),
                                 html.Div(id="selected-mz-plus-value"),
                             ],
@@ -259,17 +250,13 @@ tabs_compare = dcc.Tabs(
                             ),
                             dcc.Dropdown(
                                 id="compound-dropdown-compare",
-                                options=[
-                                    {"label": mz, "value": mz}
-                                    for mz in get_mz_values("tumor_comparable_plots")
-                                ],
+                                options=[],
                                 placeholder="Select Mz Value",
                                 searchable=True,
                                 clearable=True,
                                 multi=False,
                                 style={"width": "100%"},
                                 className="select-input",
-                                value=get_mz_values("tumor_comparable_plots")[0],
                             ),
                             html.Div(id="selected-mz-compare-value"),
                             dbc.Row(
@@ -320,19 +307,13 @@ tabs_compare = dcc.Tabs(
                                     ),
                                     dcc.Dropdown(
                                         id="compound-dropdown-compare-rcc-lcc",
-                                        options=[
-                                            {"label": mz, "value": mz}
-                                            for mz in get_mz_values("tumor_rcc_lcc_comparable_plots")
-
-                                        ],
+                                        options=[],
                                         placeholder="Select Mz Value",
                                         searchable=True,
                                         clearable=True,
                                         multi=False,
                                         style={"width": "100%"},
                                         className="select-input",
-                                        value=get_mz_values(
-                                            "tumor_rcc_lcc_comparable_plots")[0],
                                     ),
                                     html.Div(
                                         id="selected-mz-compare-rcc-lcc-value"),
@@ -393,17 +374,12 @@ tabs_survival = dcc.Tabs(
                         ),
                         dcc.Dropdown(
                             id="compound-dropdown-forest",
-                            options=[
-                                {"label": mz, "value": mz}
-                                for mz in get_mz_values("forest_plot")
-                            ],
-
+                            options=[],
                             placeholder="Select Mz Value",
                             searchable=True,
                             multi=False,
                             style={"width": "100%"},
                             className="select-input",
-                            value=get_mz_values("forest_plot")[0],
                         ),
                         html.Div(id="selected-mz-forest-value"),
                     ],
@@ -443,17 +419,12 @@ tabs_survival = dcc.Tabs(
                         ),
                         dcc.Dropdown(
                             id="compound-dropdown-forest-specific",
-                            options=[
-                                {"label": mz, "value": mz}
-                                for mz in get_q05_mz_forest_values()
-                            ],
-
+                            options=[],
                             placeholder="Select Mz Value",
                             searchable=True,
                             multi=False,
                             style={"width": "100%"},
                             className="select-input",
-                            value=list(get_q05_mz_forest_values())[0],
                         ),
                         html.Div(id="selected-mz-forest-specific-value"),
                     ],
@@ -495,17 +466,12 @@ tabs_survival = dcc.Tabs(
                         ),
                         dcc.Dropdown(
                             id="compound-dropdown-forest-rcc-lcc",
-                            options=[
-                                {"label": mz, "value": mz}
-                                for mz in get_mz_values("forest_rcc_lcc_plot")
-                            ],
-
+                            options=[],
                             placeholder="Select Mz Value",
                             searchable=True,
                             multi=False,
                             style={"width": "100%"},
                             className="select-input",
-                            value=get_mz_values("forest_rcc_lcc_plot")[0],
                         ),
                         html.Div(id="selected-mz-forest-value"),
                     ],
@@ -775,10 +741,7 @@ main_layout = dbc.Container(
                                         [
                                             dcc.Dropdown(
                                                 id="selected-metabolite-gmm-a",
-                                                options=[
-                                                    {"label": name, "value": name}
-                                                    for name in list(get_gmm_name("gmm_test_1"))
-                                                ],
+                                                options=[],
                                                 placeholder="Select Metabolite",
                                                 searchable=True,
                                                 clearable=True,
@@ -804,10 +767,7 @@ main_layout = dbc.Container(
                                     html.Label("Select Bacteria:", className="select-label"),
                                     dcc.Dropdown(
                                         id="selected-bacteria-gmm-a",
-                                        options=[
-                                            {"label": name, "value": name}
-                                            for name in list(get_column_names("gmm_test_1"))
-                                        ],
+                                        options=[],
                                         placeholder="Select Bacteria",
                                         searchable=True,
                                         clearable=True,
@@ -865,10 +825,7 @@ main_layout = dbc.Container(
                                         [
                                             dcc.Dropdown(
                                                 id="selected-metabolite-gmm-b",
-                                                options=[
-                                                    {"label": name, "value": name}
-                                                    for name in list(get_gmm_name("in_vivo"))
-                                                ],
+                                                options=[],
                                                 placeholder="Select Metabolite",
                                                 searchable=True,
                                                 clearable=True,
@@ -894,10 +851,7 @@ main_layout = dbc.Container(
                                     html.Label("Select Bacteria:", className="select-label"),
                                     dcc.Dropdown(
                                         id="selected-bacteria-gmm-b",
-                                        options=[
-                                            {"label": name, "value": name}
-                                            for name in list(get_column_names("in_vivo"))
-                                        ],
+                                        options=[],
                                         placeholder="Select Bacteria",
                                         searchable=True,
                                         clearable=True,
@@ -974,9 +928,7 @@ main_layout = dbc.Container(
                                             [
                                                 dcc.Dropdown(
                                                     id="selected-metabolites",
-                                                    options=[
-                                                        {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
-                                                    ],
+                                                    options=[],
                                                     placeholder="Select Bacteria",
                                                     multi=True,  # Allow multi-selection
                                                     searchable=True,
@@ -996,9 +948,7 @@ main_layout = dbc.Container(
                                         html.Label("Select Metabolites:", className="select-label"),
                                         dcc.Dropdown(
                                             id="selected-bacteria",
-                                            options=[
-                                                {"label": name, "value": name} for name in list(get_bacteria_names("gmm_test_1"))
-                                            ],
+                                            options=[],
                                             placeholder="Select Metabolites",
                                             multi=True,  # Allow multi-selection
                                             searchable=True,
@@ -1066,9 +1016,7 @@ main_layout = dbc.Container(
                                                     [
                                                         dcc.Dropdown(
                                                             id="selected-metabolites-heatmap-b",
-                                                            options=[
-                                                                {"label": name, "value": name} for name in list(get_gmm_name("in_vivo"))
-                                                            ],
+                                                            options=[],
                                                             placeholder="Select Metabolites for X-axis",
                                                             multi=True,  # Allow multi-selection
                                                             searchable=True,
@@ -1088,9 +1036,7 @@ main_layout = dbc.Container(
                                                  html.Label("Select Bacteria:", className="select-label"),
                                                 dcc.Dropdown(
                                                     id="selected-bacteria-heatmap-b",
-                                                    options=[
-                                                        {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
-                                                    ],
+                                                    options=[],
                                                     placeholder="Select Bacteria for Y-axis",
                                                     multi=True,  # Allow multi-selection
                                                     searchable=True,
@@ -1157,9 +1103,7 @@ main_layout = dbc.Container(
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-top",
-                                                                options=[
-                                                                    {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
-                                                                ],
+                                                                options=[],
                                                                 placeholder="Select Bacteria",
                                                                 multi=True,  # Allow multi-selection
                                                                 searchable=True,
@@ -1209,9 +1153,7 @@ main_layout = dbc.Container(
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-top-b",
-                                                                options=[
-                                                                    {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
-                                                                ],
+                                                                options=[],
                                                                 placeholder="Select Bacteria",
                                                                 multi=True,  # Allow multi-selection
                                                                 searchable=True,
@@ -1277,9 +1219,7 @@ main_layout = dbc.Container(
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-cum-top",
-                                                                options=[
-                                                                    {"label": name, "value": name} for name in list(get_column_names("gmm_test_1"))
-                                                                ],
+                                                                options=[],
                                                                 placeholder="Select Bacteria",
                                                                 multi=True,  # Allow multi-selection
                                                                 searchable=True,
@@ -1329,9 +1269,7 @@ main_layout = dbc.Container(
                                                             html.Label("Select Bacteria:", className="select-label"),
                                                             dcc.Dropdown(
                                                                 id="selected-bacteria-cum-top-b",
-                                                                options=[
-                                                                    {"label": name, "value": name} for name in list(get_column_names("in_vivo"))
-                                                                ],
+                                                                options=[],
                                                                 placeholder="Select Bacteria",
                                                                 multi=True,  # Allow multi-selection
                                                                 searchable=True,

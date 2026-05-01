@@ -163,7 +163,43 @@ def register_callbacks(app):
             return "in_vivo"     # In Vivo
         else:
             return "gmm_test_1"  # Default fallback
-    
+
+    # ===== LAZY DROPDOWN INITIALIZATION =====
+    # Pre-populating dropdowns at layout-import time bloated main_layout to ~15 MB
+    # and caused H27 client timeouts. Each dropdown below is initialized via a
+    # callback fired after the layout mounts, so the initial response stays small.
+    def _register_dropdown_init(dropdown_id, fetcher, single=True, max_items=2000):
+        @app.callback(
+            [Output(dropdown_id, "options"), Output(dropdown_id, "value")],
+            Input("url", "pathname"),
+        )
+        def _init(_):
+            try:
+                vals = list(fetcher() or [])[:max_items]
+                options = [{"label": v, "value": v} for v in vals]
+                if single:
+                    return options, (options[0]["value"] if options else None)
+                return options, []
+            except Exception as exc:
+                logging.error(f"Failed to init dropdown {dropdown_id}: {exc}")
+                return [], (None if single else [])
+
+    _register_dropdown_init("compound-dropdown",                     lambda: get_mz_values("ascending"))
+    _register_dropdown_init("compound-dropdown-mz-plus",             lambda: get_mz_values("ascending_m_plus_h"))
+    _register_dropdown_init("compound-dropdown-compare",             lambda: get_mz_values("tumor_comparable_plots"))
+    _register_dropdown_init("compound-dropdown-compare-rcc-lcc",     lambda: get_mz_values("tumor_rcc_lcc_comparable_plots"))
+    _register_dropdown_init("compound-dropdown-forest",              lambda: get_mz_values("forest_plot"))
+    _register_dropdown_init("compound-dropdown-forest-specific",     lambda: get_q05_mz_forest_values())
+    _register_dropdown_init("compound-dropdown-forest-rcc-lcc",      lambda: get_mz_values("forest_rcc_lcc_plot"))
+    _register_dropdown_init("selected-bacteria-gmm-a",               lambda: get_column_names("gmm_test_1"))
+    _register_dropdown_init("selected-bacteria-gmm-b",               lambda: get_column_names("in_vivo"))
+    _register_dropdown_init("selected-metabolites",                  lambda: get_column_names("gmm_test_1"), single=False)
+    _register_dropdown_init("selected-bacteria-heatmap-b",           lambda: get_column_names("in_vivo"),    single=False)
+    _register_dropdown_init("selected-bacteria-top",                 lambda: get_column_names("gmm_test_1"), single=False)
+    _register_dropdown_init("selected-bacteria-top-b",               lambda: get_column_names("in_vivo"),    single=False)
+    _register_dropdown_init("selected-bacteria-cum-top",             lambda: get_column_names("gmm_test_1"), single=False)
+    _register_dropdown_init("selected-bacteria-cum-top-b",           lambda: get_column_names("in_vivo"),    single=False)
+
     # Callbacks to show/hide details
     @app.callback(
         [
@@ -1159,7 +1195,9 @@ def register_callbacks(app):
         try:
             from .data_functions import get_gmm_name_by_type
             table_name = get_table_name_for_component("selected-metabolite-gmm-b")
-            metabolites = get_gmm_name_by_type(table_name, type_filter)
+            # in_vivo has ~81k distinct metabolites — cap to keep the dropdown usable
+            # and the response payload small. Server-side search can be added later.
+            metabolites = list(get_gmm_name_by_type(table_name, type_filter))[:1000]
             return [{"label": name, "value": name} for name in metabolites]
         except Exception as e:
             logging.error(f"Error updating metabolite options for Tab B: {e}")
@@ -1193,12 +1231,11 @@ def register_callbacks(app):
         try:
             from .data_functions import get_gmm_name_by_type
             table_name = "in_vivo"
-            metabolites = get_gmm_name_by_type(table_name, type_filter)
-            print(f"[DEBUG] Heatmap B metabolite options updated. Type: {type_filter}, Count: {len(metabolites)}")
+            # Cap to 1000 — see update_metabolite_options_b for rationale.
+            metabolites = list(get_gmm_name_by_type(table_name, type_filter))[:1000]
             return [{"label": name, "value": name} for name in metabolites]
         except Exception as e:
             logging.error(f"Error updating metabolite options for In Vivo Heatmap: {e}")
-            print(f"[DEBUG] Error updating metabolite options for In Vivo Heatmap: {e}")
             return []
 
     # Callback for In Vivo Top Metabolites Analysis
