@@ -13,3 +13,6 @@ appmap*
 *.log
 upload.py
 __pycache__
+backups/
+migrate_invivo.py
+*.dump

@@ -10,6 +10,9 @@ import redis
 
 logger = logging.getLogger(__name__)
 
+# Bump to orphan all existing cache entries (e.g., after a data refresh).
+CACHE_VERSION = "v2"
+
 class SimpleRedisCache:
     """Simple Redis cache that uses Redis's native eviction policies"""
     
@@ -27,7 +30,7 @@ class SimpleRedisCache:
         }
         
         key_string = json.dumps(key_data, default=str, sort_keys=True)
-        return f"cache:{hashlib.md5(key_string.encode()).hexdigest()}"
+        return f"cache:{CACHE_VERSION}:{hashlib.md5(key_string.encode()).hexdigest()}"
     
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache (Redis first, then memory fallback)"""
