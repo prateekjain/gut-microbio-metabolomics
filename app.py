@@ -10,25 +10,7 @@ from layout404 import main_layout404
 import logging
 import threading
 import time
-import redis
 import os
-
-# Redis configuration - Redis Cloud for production, localhost for development.
-# We don't ping at import time: the worker process is occasionally created before
-# Heroku finishes wiring the network namespace, so the ping resolves DNS too early
-# and logs a noisy "Error -2: Name or service not known" warning even though
-# subsequent operations succeed within seconds. simple_redis_cache handles
-# transient failures via its memory-cache fallback.
-REDIS_URL = os.getenv("REDISCLOUD_URL", "redis://localhost:6379/0")
-redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=False, socket_connect_timeout=5, socket_timeout=5)
-
-# Initialize simple Redis cache system
-from compare_tumor.simple_redis_cache import initialize_simple_redis_cache
-try:
-    redis_cache_instance = initialize_simple_redis_cache(redis_client)
-    print("Simple Redis cache system initialized successfully!")
-except Exception as e:
-    print(f"Simple Redis cache initialization failed: {e}")
 
 # Import optimization components
 from compare_tumor.data_functions import (
@@ -80,11 +62,7 @@ def initialize_performance_optimizations():
         # Warm up critical caches
         logger.info("Warming up caches...")
         warm_cache()
-        
-        # Check Redis status
-        logger.info("Checking Redis cache status...")
-        get_redis_status()
-        
+
         initialization_time = time.time() - start_time
         logger.info(f"Performance optimizations initialized successfully in {initialization_time:.2f} seconds")
         
@@ -111,29 +89,6 @@ def warm_cache():
             
         except Exception as e:
             logger.warning(f"Failed to warm cache for table {table}: {e}")
-
-def get_redis_status():
-    """Get Redis connection status and cache statistics"""
-    try:
-        from compare_tumor.simple_redis_cache import get_simple_redis_cache
-        cache = get_simple_redis_cache()
-        stats = cache.get_stats()
-        
-        logger.info("Redis Cache Statistics:")
-        logger.info(f"  - Redis Available: {stats.get('redis_available', False)}")
-        logger.info(f"  - Cache Type: {stats.get('cache_type', 'Unknown')}")
-        logger.info(f"  - Memory Cache Size: {stats.get('memory_cache_size', 0)}")
-        if 'redis_memory_used' in stats:
-            logger.info(f"  - Redis Memory Used: {stats['redis_memory_used']}")
-        if 'redis_cache_keys' in stats:
-            logger.info(f"  - Redis Cache Keys: {stats['redis_cache_keys']}")
-        if 'redis_maxmemory_policy' in stats:
-            logger.info(f"  - Redis Eviction Policy: {stats['redis_maxmemory_policy']}")
-        
-        return stats
-    except Exception as e:
-        logger.error(f"Failed to get Redis status: {e}")
-        return None
 
 # Run warm-up off the boot path so the dyno binds to the port immediately
 threading.Thread(target=initialize_performance_optimizations, daemon=True).start()

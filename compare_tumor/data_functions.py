@@ -17,9 +17,7 @@ import time
 from typing import List, Dict, Optional, Tuple, Union
 import psutil
 import gc
-import redis
 import json
-from .simple_redis_cache import simple_redis_cache, get_simple_redis_cache
 
 # Configure logging
 logging.basicConfig(
@@ -287,7 +285,6 @@ def selected_mz_cleaning(selected_mz):
 @memory_logger("get_gmm_name: Memory")
 @log_time("get_gmm_name: DB Query")
 @simple_cache(max_size=50, ttl=600)
-@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_gmm_name(table_name):
     """
     Fetches all distinct values from the 'name' column in the specified table.
@@ -386,7 +383,6 @@ def get_all_columns_data(table_name, selected_compound):
 @memory_logger("get_all_columns_data_all_compounds: Memory")
 @log_time("get_all_columns_data_all_compounds: DB Query")
 @simple_cache(max_size=10, ttl=900)  # Cache for 15 minutes - larger tables need longer cache
-@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_all_columns_data_all_compounds(table_name):
     """
     Fetches all rows and columns from the given table.
@@ -541,7 +537,6 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 @memory_logger("get_multiple_bacteria_cumm_top_metabolites: Memory")
 @log_time("get_multiple_bacteria_cumm_top_metabolites: DB Query")
 @simple_cache(max_size=50, ttl=600)  # Cache for 10 minutes as fallback
-@simple_redis_cache()  # Use our new Redis cache system
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
     if not selected_bacteria:
         return None
@@ -637,7 +632,6 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
 @memory_logger("get_metabolite_data: Memory")
 @log_time("get_metabolite_data: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache metabolite data for 5 minutes
-@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_metabolite_data(table_name, metabolite):
     """Fetch all bacteria values for a specific metabolite"""
     try:
@@ -678,7 +672,6 @@ def get_metabolite_data(table_name, metabolite):
 @memory_logger("get_bacteria_data: Memory")
 @log_time("get_bacteria_data: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache bacteria data for 5 minutes
-@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_bacteria_data(table_name, bacteria):
     """Fetch all metabolite values for a specific bacteria"""
     try:
@@ -704,7 +697,6 @@ def get_bacteria_data(table_name, bacteria):
             
 @log_time("get_column_names: DB Query")
 @simple_cache(max_size=20, ttl=600)  # Cache column names for 10 minutes
-@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_column_names(table_name):
     """
     Fetches all column names except the 'name' column from the table.
@@ -785,7 +777,6 @@ def get_bacteria_names(table_name):
 @memory_logger("get_top_bottom_bacteria_values: Memory")
 @log_time("get_top_bottom_bacteria_values: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache for 5 minutes
-@simple_redis_cache()  # Simple Redis cache with native eviction
 def get_top_bottom_bacteria_values(table_name, selected_compound, top_n=10, order="desc"):
     """
     Fetches top/bottom N bacteria values for a selected compound, with processing offloaded to the database.
@@ -1449,7 +1440,6 @@ def get_dropdown_options():
 
 @log_time("get_gmm_name_by_type: DB Query")
 @simple_cache(max_size=20, ttl=600)
-@simple_redis_cache()
 def get_gmm_name_by_type(table_name, type_filter="all"):
     """
     Fetches metabolites filtered by type. Handles different table structures:

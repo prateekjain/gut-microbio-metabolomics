@@ -39,4 +39,3 @@ matplotlib
 matplotlib-inline
 Pillow>=10.2.0
 joblib==1.4.2
-redis==5.0.4
