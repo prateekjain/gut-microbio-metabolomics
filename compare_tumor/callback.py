@@ -791,7 +791,7 @@ def register_callbacks(app):
                 return create_empty_figure("No Bacteria Selected", "Please select bacteria from the dropdown to view the plot.")
 
             # Fetch data for all bacteria in the top 10 metabolites
-            df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria)
+            df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria, type_filter=type_filter)
             logging.info(f'Top 10 df shape: {df.shape if df is not None else "None"}')
 
             # Handle edge cases
@@ -802,10 +802,6 @@ def register_callbacks(app):
             # Filter the DataFrame to include only the selected bacteria
             if selected_bacteria:
                 df = df[df["bacteria"].isin(selected_bacteria)]
-
-            if type_filter and type_filter != "all":
-                allowed = set(get_gmm_name_by_type(table_name, type_filter))
-                df = df[df["metabolite"].isin(allowed)]
 
             if df.empty:
                 logging.info("Selected bacteria do not meet the conditions.")
@@ -847,22 +843,13 @@ def register_callbacks(app):
                     "Please select at least 2 bacteria to compare their collective presence in top producers."
                 )
 
-            df = get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria)
+            df = get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria, type_filter=type_filter)
 
             if df is None or df.empty:
                 return create_empty_figure(
                     "No Matching Data",
                     f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite."
                 )
-
-            if type_filter and type_filter != "all":
-                allowed = set(get_gmm_name_by_type(table_name, type_filter))
-                df = df[df["metabolite"].isin(allowed)]
-                if df.empty:
-                    return create_empty_figure(
-                        "No Matching Data",
-                        "No metabolites match the selected type filter."
-                    )
 
             # Use the optimized plotting function from dynamicPlots.py
             from compare_tumor.dynamicPlots import create_dynamic_scatter_plot
@@ -1337,7 +1324,7 @@ def register_callbacks(app):
                 return create_empty_figure("No Bacteria Selected", "Please select bacteria from the dropdown to view the plot.")
 
             # Fetch data for all bacteria in the top 10 metabolites
-            df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria)
+            df = get_multiple_bacteria_top_metabolites(table_name, selected_bacteria, type_filter=type_filter)
             logging.info(f'In Vivo top 10 df shape: {df.shape if df is not None else "None"}')
 
             if df is None or df.empty:
@@ -1347,10 +1334,6 @@ def register_callbacks(app):
             # Filter the DataFrame to include only the selected bacteria
             if selected_bacteria:
                 df = df[df["bacteria"].isin(selected_bacteria)]
-
-            if type_filter and type_filter != "all":
-                allowed = set(get_gmm_name_by_type(table_name, type_filter))
-                df = df[df["metabolite"].isin(allowed)]
 
             if df.empty:
                 return create_empty_figure(
@@ -1395,22 +1378,13 @@ def register_callbacks(app):
                     "Please select at least 2 bacteria to compare their collective presence in top producers."
                 )
 
-            df = get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria)
+            df = get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria, type_filter=type_filter)
 
             if df is None or df.empty:
                 return create_empty_figure(
                     "No Matching Data",
                     f"The selected bacteria ({', '.join(selected_bacteria)}) are not collectively in the top 10 producers for any metabolite."
                 )
-
-            if type_filter and type_filter != "all":
-                allowed = set(get_gmm_name_by_type(table_name, type_filter))
-                df = df[df["metabolite"].isin(allowed)]
-                if df.empty:
-                    return create_empty_figure(
-                        "No Matching Data",
-                        "No metabolites match the selected type filter."
-                    )
 
             # Use the optimized plotting function from dynamicPlots.py
             from compare_tumor.dynamicPlots import create_dynamic_scatter_plot

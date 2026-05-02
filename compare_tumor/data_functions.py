@@ -426,22 +426,30 @@ def get_all_columns_data_all_compounds(table_name):
 
 
 
+_TYPE_FILTER_VALUES = {"by_positive", "by_negative", "by_name"}
+
+
 @memory_logger("get_multiple_bacteria_top_metabolites: Memory")
 @log_time("get_multiple_bacteria_top_metabolites: DB Query")
 @simple_cache(max_size=50, ttl=600)
-def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
+def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria, type_filter=None):
     """
     OPTIMIZED: Fetches metabolites for selected bacteria where they rank in top 10 producers.
     Simplified query to avoid TLE issues.
-    
+
     Args:
         table_name (str): Name of the table in the database.
         selected_bacteria (list): List of bacteria to filter by.
+        type_filter (str|None): If 'by_positive' / 'by_negative' / 'by_name', restricts
+            the underlying rows to that Type bucket inside the SQL. Pushing the filter
+            into the query keeps the cache key honest (different type → different df)
+            and avoids a post-fetch pandas intersection that historically returned
+            empty results when caches and Type buckets drifted.
 
     Returns:
         pd.DataFrame: Filtered DataFrame containing metabolites for selected bacteria in the top 10.
     """
-    logging.info("Fetching top metabolites for selected bacteria: %s", selected_bacteria)
+    logging.info("Fetching top metabolites for selected bacteria: %s (type_filter=%s)", selected_bacteria, type_filter)
     if not selected_bacteria:
         return None
 
@@ -449,35 +457,45 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
         with get_db_connection() as cursor:
             # Validate that selected bacteria columns exist
             cursor.execute(f"""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = %s 
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = %s
                 AND column_name = ANY(%s)
             """, (table_name, selected_bacteria))
-            
+
             valid_bacteria = [row[0] for row in cursor.fetchall()]
             if not valid_bacteria:
                 logging.warning("None of the selected bacteria columns exist in table: %s", table_name)
                 return None
-            
+
             logging.info("Valid bacteria columns: %s", valid_bacteria)
-            
+
+            type_clause = ""
+            type_params = ()
+            if type_filter in _TYPE_FILTER_VALUES:
+                type_clause = ' AND "Type" = %s'
+                type_params = (type_filter,) * len(valid_bacteria)
+
             # SIMPLIFIED APPROACH: Get data for selected bacteria only, then rank them
             # This avoids the massive UNION ALL operation that causes TLE
-            
+
             # Build a simpler query that only looks at selected bacteria
             bacteria_conditions = []
             for bacteria in valid_bacteria:
                 bacteria_conditions.append(f'"{bacteria}" IS NOT NULL AND "{bacteria}" > 0')
-            
+
             # Get metabolites where at least one selected bacteria has a value
             where_clause = ' OR '.join(bacteria_conditions)
-            
+
             # Build the unpivot query only for selected bacteria
             unpivot_parts = []
             for bacteria in valid_bacteria:
-                unpivot_parts.append(f'SELECT name as metabolite, \'{bacteria}\' as bacteria, "{bacteria}"::double precision as value FROM {table_name} WHERE "{bacteria}" IS NOT NULL AND "{bacteria}" > 0')
-            
+                unpivot_parts.append(
+                    f'SELECT name as metabolite, \'{bacteria}\' as bacteria, '
+                    f'"{bacteria}"::double precision as value FROM {table_name} '
+                    f'WHERE "{bacteria}" IS NOT NULL AND "{bacteria}" > 0{type_clause}'
+                )
+
             unpivot_query = ' UNION ALL '.join(unpivot_parts)
             
             # Simplified ranking query - only rank within selected bacteria
@@ -500,8 +518,8 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
             """
             
             logging.info("Executing simplified query for %d selected bacteria", len(valid_bacteria))
-            
-            cursor.execute(ranking_query)
+
+            cursor.execute(ranking_query, type_params)
             data = cursor.fetchall()
             
             if not data:
@@ -537,7 +555,7 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria):
 @memory_logger("get_multiple_bacteria_cumm_top_metabolites: Memory")
 @log_time("get_multiple_bacteria_cumm_top_metabolites: DB Query")
 @simple_cache(max_size=50, ttl=600)  # Cache for 10 minutes as fallback
-def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
+def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria, type_filter=None):
     if not selected_bacteria:
         return None
 
@@ -546,26 +564,36 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
         with get_db_connection() as cursor:
             # Validate that selected bacteria columns exist
             cursor.execute(f"""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = %s 
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = %s
                 AND column_name = ANY(%s)
             """, (table_name, selected_bacteria))
-            
+
             valid_bacteria = [row[0] for row in cursor.fetchall()]
             if not valid_bacteria:
                 logging.warning("None of the selected bacteria columns exist in table: %s", table_name)
                 return None
-            
-            logging.info("Valid bacteria columns for cumulative analysis: %s", valid_bacteria)
-            
+
+            logging.info("Valid bacteria columns for cumulative analysis: %s (type_filter=%s)", valid_bacteria, type_filter)
+
+            type_clause = ""
+            type_params = ()
+            if type_filter in _TYPE_FILTER_VALUES:
+                type_clause = ' AND "Type" = %s'
+                type_params = (type_filter,) * len(valid_bacteria)
+
             # SIMPLIFIED APPROACH: Get metabolites where ALL selected bacteria have values > 0
             # Then rank them within the selected bacteria only
-            
+
             # Build the unpivot query only for selected bacteria
             unpivot_parts = []
             for bacteria in valid_bacteria:
-                unpivot_parts.append(f'SELECT name as metabolite, \'{bacteria}\' as bacteria, "{bacteria}"::double precision as value FROM {table_name} WHERE "{bacteria}" IS NOT NULL AND "{bacteria}" > 0')
+                unpivot_parts.append(
+                    f'SELECT name as metabolite, \'{bacteria}\' as bacteria, '
+                    f'"{bacteria}"::double precision as value FROM {table_name} '
+                    f'WHERE "{bacteria}" IS NOT NULL AND "{bacteria}" > 0{type_clause}'
+                )
             
             unpivot_query = ' UNION ALL '.join(unpivot_parts)
             
@@ -597,8 +625,8 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria):
             """
             
             logging.info("Executing simplified cumulative query for %d selected bacteria", len(valid_bacteria))
-            
-            cursor.execute(simplified_query)
+
+            cursor.execute(simplified_query, type_params)
             data = cursor.fetchall()
             
             if not data:
