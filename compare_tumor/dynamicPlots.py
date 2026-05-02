@@ -627,7 +627,7 @@ def addAnotations(plot_all_regions, qFdrStars):
 @memory_logger("create_dynamic_scatter_plot: Memory")
 @log_time("create_dynamic_scatter_plot: Plotting")
 @plot_performance_logger
-def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bottom=None):
+def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bottom=None, bacteria_order=None):
     """
     Enhanced scatter plot creation with dynamic sizing and better performance
     
@@ -698,9 +698,15 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
     # Color-by-bacteria with legend when comparing multiple bacteria on the same
     # x-axis. Legend doubles as a click-to-toggle filter. Above ~20 bacteria the
     # legend dominates the canvas, so fall back to a single-trace render then.
-    unique_bacteria = data_clean["bacteria"].unique()
+    # Use the caller-supplied selection order when available so every selected
+    # bacteria gets a legend entry — even ones with zero matching points get a
+    # stub trace, so the user can see "this bacteria didn't contribute."
+    if bacteria_order:
+        legend_bacteria = list(bacteria_order)
+    else:
+        legend_bacteria = list(data_clean["bacteria"].unique())
     multi_bacteria = (
-        plot_type == "bacteria" and 1 < len(unique_bacteria) <= BACTERIA_LEGEND_LIMIT
+        plot_type == "bacteria" and 1 < len(legend_bacteria) <= BACTERIA_LEGEND_LIMIT
     )
 
     hovertemplate = (
@@ -726,10 +732,23 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
             hovertemplate=hovertemplate,
         ))
 
+    def _add_empty_legend_entry(name, color):
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None], mode="markers", name=name, showlegend=True,
+            marker=dict(size=marker_size, color=color, opacity=0.85,
+                        line=dict(width=1, color="white")),
+            hoverinfo="skip",
+        ))
+
     if multi_bacteria:
-        for i, bact in enumerate(unique_bacteria):
+        for i, bact in enumerate(legend_bacteria):
             sub = data_clean[data_clean["bacteria"] == bact]
-            _add_trace(sub, name=bact.replace("_", " "), color=BACTERIA_PALETTE[i % len(BACTERIA_PALETTE)])
+            color = BACTERIA_PALETTE[i % len(BACTERIA_PALETTE)]
+            display_name = bact.replace("_", " ")
+            if not sub.empty:
+                _add_trace(sub, name=display_name, color=color)
+            else:
+                _add_empty_legend_entry(display_name, color)
     else:
         _add_trace(data_clean, name=None, color=BACTERIA_PALETTE[0])
 
@@ -770,19 +789,21 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
         template="plotly_white",
         autosize=True,
         height=520,
-        margin=dict(l=80, r=60, b=120, t=80, pad=4),
+        margin=dict(l=80, r=240 if multi_bacteria else 60, b=120, t=80, pad=4),
         plot_bgcolor='white',
         paper_bgcolor='white',
         showlegend=multi_bacteria,
         legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
+            orientation="v",
+            yanchor="top",
+            y=1.0,
+            xanchor="left",
+            x=1.02,
             bgcolor="rgba(255,255,255,0.7)",
             bordercolor="rgba(0,0,0,0.1)",
             borderwidth=1,
+            font=dict(size=11),
+            itemsizing="constant",
         ),
         # uirevision keeps user zoom/pan state stable across callback updates so the
         # chart doesn't visually re-layout from scratch every render.

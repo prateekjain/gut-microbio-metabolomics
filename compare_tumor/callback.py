@@ -817,7 +817,8 @@ def register_callbacks(app):
             fig = create_dynamic_scatter_plot(
                 data=df,
                 plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
-                title="Top 10 Metabolites for Selected Bacteria"
+                title="Top 10 Metabolites for Selected Bacteria",
+                bacteria_order=selected_bacteria,
             )
 
             return fig
@@ -869,7 +870,8 @@ def register_callbacks(app):
             fig = create_dynamic_scatter_plot(
                 data=df,
                 plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
-                title="Metabolites where Selected Bacteria are Collectively in Top 10 Producers"
+                title="Metabolites where Selected Bacteria are Collectively in Top 10 Producers",
+                bacteria_order=selected_bacteria,
             )
 
             return fig
@@ -1362,7 +1364,8 @@ def register_callbacks(app):
             fig = create_dynamic_scatter_plot(
                 data=df,
                 plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
-                title="In Vivo: Top 10 Metabolites for Selected Bacteria"
+                title="In Vivo: Top 10 Metabolites for Selected Bacteria",
+                bacteria_order=selected_bacteria,
             )
 
             return fig
@@ -1415,7 +1418,8 @@ def register_callbacks(app):
             fig = create_dynamic_scatter_plot(
                 data=df,
                 plot_type="bacteria",  # We're plotting bacteria on x-axis, metabolites on y-axis
-                title="In Vivo: Metabolites where Selected Bacteria are Collectively in Top 10 Producers"
+                title="In Vivo: Metabolites where Selected Bacteria are Collectively in Top 10 Producers",
+                bacteria_order=selected_bacteria,
             )
 
             return fig
