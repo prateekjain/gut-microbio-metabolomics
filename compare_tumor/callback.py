@@ -376,12 +376,22 @@ def register_callbacks(app):
             # browsers stall rendering an SVG hundreds of thousands of pixels wide.
             scatter_width = min(8000, max(1000, len(x_axis.unique()) * 20))
 
+            hover_customdata = (
+                df.assign(bacteria=df["bacteria"].astype(str).str.replace("_", " "))
+                  [["bacteria", "metabolite"]].values
+            )
             fig.add_trace(
                 go.Scatter(
                     x=x_axis,
                     y=y_axis,
                     mode="markers",
                     marker=dict(size=max(5, 100 // len(x_axis.unique())), color="#1D78B4"),
+                    customdata=hover_customdata,
+                    hovertemplate=(
+                        "<b>Bacteria</b>: %{customdata[0]}<br>"
+                        "<b>Metabolite</b>: %{customdata[1]}<br>"
+                        "<b>Value</b>: %{y:.2f}<extra></extra>"
+                    ),
                 )
             )
 
@@ -516,12 +526,22 @@ def register_callbacks(app):
             # browsers stall rendering an SVG hundreds of thousands of pixels wide.
             scatter_width = min(8000, max(1000, len(x_axis.unique()) * 20))
 
+            hover_customdata = (
+                df.assign(bacteria=df["bacteria"].astype(str).str.replace("_", " "))
+                  [["bacteria", "metabolite"]].values
+            )
             fig.add_trace(
                 go.Scatter(
                     x=x_axis,
                     y=y_axis,
                     mode="markers",
                     marker=dict(size=max(5, 100 // len(x_axis.unique())), color="#1D78B4"),
+                    customdata=hover_customdata,
+                    hovertemplate=(
+                        "<b>Bacteria</b>: %{customdata[0]}<br>"
+                        "<b>Metabolite</b>: %{customdata[1]}<br>"
+                        "<b>Value</b>: %{y:.2f}<extra></extra>"
+                    ),
                 )
             )
 
@@ -686,12 +706,22 @@ def register_callbacks(app):
             # browsers stall rendering an SVG hundreds of thousands of pixels wide.
             scatter_width = min(8000, max(1000, len(x_axis.unique()) * 20))
 
+            hover_customdata = (
+                df.assign(bacteria=df["bacteria"].astype(str).str.replace("_", " "))
+                  [["bacteria", "metabolite"]].values
+            )
             fig.add_trace(
                 go.Scatter(
                     x=x_axis,
                     y=y_axis,
                     mode="markers",
                     marker=dict(size=max(5, 100 // len(x_axis.unique())), color="#1D78B4"),
+                    customdata=hover_customdata,
+                    hovertemplate=(
+                        "<b>Bacteria</b>: %{customdata[0]}<br>"
+                        "<b>Metabolite</b>: %{customdata[1]}<br>"
+                        "<b>Value</b>: %{y:.2f}<extra></extra>"
+                    ),
                 )
             )
 

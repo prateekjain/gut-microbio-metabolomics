@@ -17,6 +17,17 @@ logger = logging.getLogger(__name__)
 region = ["cecum", "ascending", "transverse",
           "descending", "sigmoid", "rectosigmoid", "rectum"]
 
+# Color palette for per-bacteria scatter traces (Tableau-10 + Pastel-10).
+# 20 distinct hues — beyond that, legend overwhelms the chart and we collapse
+# to a single trace.
+BACTERIA_PALETTE = [
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+    "#8c564b", "#e377c2", "#17becf", "#bcbd22", "#7f7f7f",
+    "#aec7e8", "#ffbb78", "#98df8a", "#ff9896", "#c5b0d5",
+    "#c49c94", "#f7b6d2", "#9edae5", "#dbdb8d", "#c7c7c7",
+]
+BACTERIA_LEGEND_LIMIT = 20
+
 def memory_logger(label):
     """Decorator to log memory usage before and after function execution"""
     def decorator(func):
@@ -657,18 +668,22 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
         return fig
     
     # Data processing optimizations
-    data_clean = data.dropna()
-    
+    data_clean = data.dropna().copy()
+    data_clean["bacteria_display"] = data_clean["bacteria"].str.replace("_", " ")
+    data_clean["metabolite_display"] = data_clean["metabolite"].astype(str)
+
     if plot_type == "metabolite":
-        x_axis = data_clean["bacteria"].str.replace("_", " ").str.upper()
-        y_axis = data_clean["value"]
+        x_col = "bacteria"
         x_title = "Bacteria"
         title = title or f"Values for Metabolite"
     else:  # bacteria
-        x_axis = data_clean["metabolite"].str.replace("_", " ").str.upper() 
-        y_axis = data_clean["value"]
+        x_col = "metabolite"
         x_title = "Metabolite"
         title = title or f"Values for Bacteria"
+
+    data_clean["_x"] = data_clean[x_col].str.replace("_", " ").str.upper()
+    x_axis = data_clean["_x"]
+    y_axis = data_clean["value"]
 
     # Number of unique x-values drives marker size + tick density. Width/height
     # are NOT hard-coded — let dcc.Graph(config={'responsive': True}) and the
@@ -676,32 +691,47 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
     # 1400x800 regardless of viewport, overflowing the container and reflowing
     # the page on every callback update ("wobble").
     num_points = len(x_axis.unique())
-
-    # Create optimized scatter plot
-    fig = go.Figure()
-    
-    # Enhanced markers with better visual encoding
     marker_size = max(6, min(15, 100 // num_points))
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'] * (num_points // 5 + 1)
-    
-    fig.add_trace(
-        go.Scatter(
-            x=x_axis,
-            y=y_axis,
-            mode="markers",
-            marker=dict(
-                size=marker_size, 
-                color=colors[:len(x_axis)],
-                opacity=0.8,
-                line=dict(width=1, color='white')
-            ),
-            hovertemplate=(
-                f"<b>{x_title}</b>: %{{x}}<br>" +
-                "<b>Value</b>: %{y:.2f}<br>" +
-                "<extra></extra>"
-            )
-        )
+
+    fig = go.Figure()
+
+    # Color-by-bacteria with legend when comparing multiple bacteria on the same
+    # x-axis. Legend doubles as a click-to-toggle filter. Above ~20 bacteria the
+    # legend dominates the canvas, so fall back to a single-trace render then.
+    unique_bacteria = data_clean["bacteria"].unique()
+    multi_bacteria = (
+        plot_type == "bacteria" and 1 < len(unique_bacteria) <= BACTERIA_LEGEND_LIMIT
     )
+
+    hovertemplate = (
+        "<b>Bacteria</b>: %{customdata[0]}<br>"
+        "<b>Metabolite</b>: %{customdata[1]}<br>"
+        "<b>Value</b>: %{y:.2f}<extra></extra>"
+    )
+
+    def _add_trace(sub, name, color):
+        fig.add_trace(go.Scatter(
+            x=sub["_x"],
+            y=sub["value"],
+            mode="markers",
+            name=name,
+            showlegend=name is not None,
+            marker=dict(
+                size=marker_size,
+                color=color,
+                opacity=0.85,
+                line=dict(width=1, color="white"),
+            ),
+            customdata=sub[["bacteria_display", "metabolite_display"]].values,
+            hovertemplate=hovertemplate,
+        ))
+
+    if multi_bacteria:
+        for i, bact in enumerate(unique_bacteria):
+            sub = data_clean[data_clean["bacteria"] == bact]
+            _add_trace(sub, name=bact.replace("_", " "), color=BACTERIA_PALETTE[i % len(BACTERIA_PALETTE)])
+    else:
+        _add_trace(data_clean, name=None, color=BACTERIA_PALETTE[0])
 
     # Enhanced layout with better responsiveness
     fig.update_layout(
@@ -743,6 +773,17 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
         margin=dict(l=80, r=60, b=120, t=80, pad=4),
         plot_bgcolor='white',
         paper_bgcolor='white',
+        showlegend=multi_bacteria,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            bgcolor="rgba(255,255,255,0.7)",
+            bordercolor="rgba(0,0,0,0.1)",
+            borderwidth=1,
+        ),
         # uirevision keeps user zoom/pan state stable across callback updates so the
         # chart doesn't visually re-layout from scratch every render.
         uirevision='cumm-top-plot',
