@@ -372,7 +372,9 @@ def register_callbacks(app):
                 x_title = "Metabolite"
                 title = f"Values for Bacteria: {selected_bacteria}"
 
-            scatter_width = max(1000, len(x_axis.unique()) * 20)
+            # Cap width — bacteria-on-metabolites can hit 30k+ unique x values, and
+            # browsers stall rendering an SVG hundreds of thousands of pixels wide.
+            scatter_width = min(8000, max(1000, len(x_axis.unique()) * 20))
 
             fig.add_trace(
                 go.Scatter(
@@ -510,7 +512,9 @@ def register_callbacks(app):
                 x_title = "Metabolite"
                 title = f"Values for Bacteria: {selected_bacteria}"
 
-            scatter_width = max(1000, len(x_axis.unique()) * 20)
+            # Cap width — bacteria-on-metabolites can hit 30k+ unique x values, and
+            # browsers stall rendering an SVG hundreds of thousands of pixels wide.
+            scatter_width = min(8000, max(1000, len(x_axis.unique()) * 20))
 
             fig.add_trace(
                 go.Scatter(
@@ -678,7 +682,9 @@ def register_callbacks(app):
                 x_title = "Metabolite"
                 title = f"Values for Bacteria: {selected_bacteria}"
 
-            scatter_width = max(1000, len(x_axis.unique()) * 20)
+            # Cap width — bacteria-on-metabolites can hit 30k+ unique x values, and
+            # browsers stall rendering an SVG hundreds of thousands of pixels wide.
+            scatter_width = min(8000, max(1000, len(x_axis.unique()) * 20))
 
             fig.add_trace(
                 go.Scatter(
