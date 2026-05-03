@@ -1827,7 +1827,7 @@ def get_heatmap_data(table_name: str, metabolites: List[str], bacteria: List[str
         with get_db_connection() as cursor:
             # Sanitize column names to prevent SQL injection.
             safe_bacteria_cols = [f'"{col}"' for col in bacteria if col.replace('_', '').isalnum()]
-            
+
             if not safe_bacteria_cols:
                 logging.error("No valid bacteria columns provided.")
                 return None
@@ -1835,32 +1835,41 @@ def get_heatmap_data(table_name: str, metabolites: List[str], bacteria: List[str
             # Create the part of the query for "Net Balance"
             net_balance_sql = " + ".join([f"COALESCE({col}, 0)" for col in safe_bacteria_cols])
 
+            # If the table carries a `metabolite` column (in_vivo), prefer it for the
+            # x-axis tick label. Fall back to `name` when metabolite is null or absent.
+            cursor.execute(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = %s AND column_name = 'metabolite'",
+                (table_name,),
+            )
+            label_expr = "COALESCE(metabolite, name)" if cursor.fetchone() else "name"
+
             # Construct the main query
             query = f"""
-            SELECT 
-                name,
+            SELECT
+                {label_expr} AS heatmap_label,
                 {', '.join(safe_bacteria_cols)},
                 ({net_balance_sql}) AS "Net Balance"
             FROM {table_name}
             WHERE name = ANY(%s)
             """
-            
+
             logging.info(f"Executing optimized heatmap query on {table_name}.")
-            
+
             # Use psycopg2's list adaptation for the IN clause
             cursor.execute(query, (metabolites,))
-            
+
             data = cursor.fetchall()
-            
+
             if not data:
                 logging.warning(f"No data returned from heatmap query for table {table_name}.")
                 return None
-                
+
             columns = [desc[0] for desc in cursor.description]
             df = pd.DataFrame(data, columns=columns)
-            
+
             # Set index and transpose for heatmap
-            df_processed = df.set_index("name").T
+            df_processed = df.set_index("heatmap_label").T
             
             # Ensure "Net Balance" is the first row
             if "Net Balance" in df_processed.index:
