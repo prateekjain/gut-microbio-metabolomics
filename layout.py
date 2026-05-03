@@ -809,22 +809,18 @@ main_layout = dbc.Container(
                                         className="select-input radio-horizontal",
                                     ),
                                     html.Label("Select Metabolite:", className="select-label"),
-                                    create_loading_wrapper(
-                                        "metabolite-dropdown-b",
-                                        [
-                                            dcc.Dropdown(
-                                                id="selected-metabolite-gmm-b",
-                                                options=[],
-                                                placeholder="Select Metabolite",
-                                                searchable=True,
-                                                clearable=True,
-                                                multi=False,
-                                                style={"width": "100%"},
-                                                className="select-input",
-                                            ),
-                                        ],
-                                        "dot",
-                                        "dropdown-loading"
+                                    # No dcc.Loading wrapper here: the options callback fires on
+                                    # every keystroke (server-side search), and a loading overlay
+                                    # would steal focus from the search input on each fire.
+                                    dcc.Dropdown(
+                                        id="selected-metabolite-gmm-b",
+                                        options=[],
+                                        placeholder="Select Metabolite",
+                                        searchable=True,
+                                        clearable=True,
+                                        multi=False,
+                                        style={"width": "100%"},
+                                        className="select-input",
                                     ),
                                     dbc.RadioItems(
                                         id="top-bottom-radio-b",
@@ -1000,22 +996,17 @@ main_layout = dbc.Container(
                                                 ),
 
                                                 html.Label("Select Metabolites", className="select-label"),
-                                                create_loading_wrapper(
-                                                    "metabolites-dropdown-heatmap-b",
-                                                    [
-                                                        dcc.Dropdown(
-                                                            id="selected-metabolites-heatmap-b",
-                                                            options=[],
-                                                            placeholder="Select Metabolites for X-axis",
-                                                            multi=True,  # Allow multi-selection
-                                                            searchable=True,
-                                                            clearable=True,
-                                                            style={"width": "100%"},
-                                                            className="select-input",
-                                                        ),
-                                                    ],
-                                                    "dot",
-                                                    "dropdown-loading"
+                                                # No dcc.Loading wrapper here: see selected-metabolite-gmm-b
+                                                # for rationale (per-keystroke server search vs spinner overlay).
+                                                dcc.Dropdown(
+                                                    id="selected-metabolites-heatmap-b",
+                                                    options=[],
+                                                    placeholder="Select Metabolites for X-axis",
+                                                    multi=True,
+                                                    searchable=True,
+                                                    clearable=True,
+                                                    style={"width": "100%"},
+                                                    className="select-input",
                                                 ),
                                             ],
                                             md=6,
