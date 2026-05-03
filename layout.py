@@ -711,59 +711,75 @@ main_layout = dbc.Container(
                         children=[
                             dbc.Row([
                                 dbc.Col([
-                                    html.Label("Filter by Type:", className="select-label"),
-                                    dbc.RadioItems(
-                                        id="type-filter-radio-a",
-                                        options=[
-                                            {"label": "By Name", "value": "by_name"},
-                                            {"label": "By Positive", "value": "by_positive"},
-                                            {"label": "By Negative", "value": "by_negative"},
-                                            {"label": "All Types", "value": "all"}
-                                        ],
-                                        value="all",
-                                        inline=True,
-                                        className="select-input radio-horizontal",
-                                    ),
-                                    html.Label("Select Metabolite:", className="select-label"),
-                                    create_loading_wrapper(
-                                        "metabolite-dropdown-a",
-                                        [
-                                            dcc.Dropdown(
-                                                id="selected-metabolite-gmm-a",
-                                                options=[],
-                                                placeholder="Select Metabolite",
-                                                searchable=True,
-                                                clearable=True,
-                                                multi=False,
-                                                style={"width": "100%"},
-                                                className="select-input",
-                                            ),
-                                        ],
-                                        "dot",
-                                        "dropdown-loading"
-                                    ),
-                                    dbc.RadioItems(
-                                        id="top-bottom-radio-a",
-                                        options=[
-                                            {"label": "All", "value": "all"},
-                                            {"label": "Top 10", "value": "top"},
-                                            {"label": "Bottom 10", "value": "bottom"}
-                                        ],
-                                        value="all",
-                                        inline=True,
-                                        className="select-input radio-horizontal",
-                                    ),
-                                    html.Label("Select Bacteria:", className="select-label"),
-                                    dcc.Dropdown(
-                                        id="selected-bacteria-gmm-a",
-                                        options=[],
-                                        placeholder="Select Bacteria",
-                                        searchable=True,
-                                        clearable=True,
-                                        multi=False,
-                                        style={"width": "100%"},
-                                        className="select-input",
-                                    ),
+                                    html.Div([
+                                        html.H6("Step 1 — Choose what to explore", className="step-title"),
+                                        html.P(
+                                            "Pick either a metabolite or a bacteria. Selecting one clears the other.",
+                                            className="step-hint",
+                                        ),
+                                        html.Label("Select Metabolite:", className="select-label"),
+                                        create_loading_wrapper(
+                                            "metabolite-dropdown-a",
+                                            [
+                                                dcc.Dropdown(
+                                                    id="selected-metabolite-gmm-a",
+                                                    options=[],
+                                                    placeholder="Select Metabolite",
+                                                    searchable=True,
+                                                    clearable=True,
+                                                    multi=False,
+                                                    style={"width": "100%"},
+                                                    className="select-input",
+                                                ),
+                                            ],
+                                            "dot",
+                                            "dropdown-loading"
+                                        ),
+                                        html.Div("— OR —", className="or-divider"),
+                                        html.Label("Select Bacteria:", className="select-label"),
+                                        dcc.Dropdown(
+                                            id="selected-bacteria-gmm-a",
+                                            options=[],
+                                            placeholder="Select Bacteria",
+                                            searchable=True,
+                                            clearable=True,
+                                            multi=False,
+                                            style={"width": "100%"},
+                                            className="select-input",
+                                        ),
+                                    ], className="step-card"),
+                                    html.Div([
+                                        html.H6("Step 2 — Filter & view", className="step-title"),
+                                        html.P(
+                                            "These filters apply to your current selection.",
+                                            className="step-hint",
+                                        ),
+                                        html.Label("Filter Metabolites by Type:", className="select-label"),
+                                        dbc.RadioItems(
+                                            id="type-filter-radio-a",
+                                            options=[
+                                                {"label": "By Name", "value": "by_name"},
+                                                {"label": "By Positive", "value": "by_positive"},
+                                                {"label": "By Negative", "value": "by_negative"},
+                                                {"label": "All Types", "value": "all"}
+                                            ],
+                                            value="all",
+                                            inline=True,
+                                            className="select-input radio-horizontal",
+                                        ),
+                                        html.Label("Show:", className="select-label"),
+                                        dbc.RadioItems(
+                                            id="top-bottom-radio-a",
+                                            options=[
+                                                {"label": "All", "value": "all"},
+                                                {"label": "Top 10", "value": "top"},
+                                                {"label": "Bottom 10", "value": "bottom"}
+                                            ],
+                                            value="all",
+                                            inline=True,
+                                            className="select-input radio-horizontal",
+                                        ),
+                                    ], className="step-card"),
                                     create_loading_wrapper(
                                         "gmm-scatter-a",
                                         [
@@ -795,55 +811,71 @@ main_layout = dbc.Container(
                         children=[
                             dbc.Row([
                                 dbc.Col([
-                                    html.Label("Filter by Type:", className="select-label"),
-                                    dbc.RadioItems(
-                                        id="type-filter-radio-b",
-                                        options=[
-                                            {"label": "By Name", "value": "by_name"},
-                                            {"label": "By Positive", "value": "by_positive"},
-                                            {"label": "By Negative", "value": "by_negative"},
-                                            {"label": "All Types", "value": "all"}
-                                        ],
-                                        value="all",
-                                        inline=True,
-                                        className="select-input radio-horizontal",
-                                    ),
-                                    html.Label("Select Metabolite:", className="select-label"),
-                                    # No dcc.Loading wrapper here: the options callback fires on
-                                    # every keystroke (server-side search), and a loading overlay
-                                    # would steal focus from the search input on each fire.
-                                    dcc.Dropdown(
-                                        id="selected-metabolite-gmm-b",
-                                        options=[],
-                                        placeholder="Select Metabolite",
-                                        searchable=True,
-                                        clearable=True,
-                                        multi=False,
-                                        style={"width": "100%"},
-                                        className="select-input",
-                                    ),
-                                    dbc.RadioItems(
-                                        id="top-bottom-radio-b",
-                                        options=[
-                                            {"label": "All", "value": "all"},
-                                            {"label": "Top 10", "value": "top"},
-                                            {"label": "Bottom 10", "value": "bottom"}
-                                        ],
-                                        value="all",
-                                        inline=True,
-                                        className="select-input radio-horizontal",
-                                    ),
-                                    html.Label("Select Bacteria:", className="select-label"),
-                                    dcc.Dropdown(
-                                        id="selected-bacteria-gmm-b",
-                                        options=[],
-                                        placeholder="Select Bacteria",
-                                        searchable=True,
-                                        clearable=True,
-                                        multi=False,
-                                        style={"width": "100%"},
-                                        className="select-input",
-                                    ),
+                                    html.Div([
+                                        html.H6("Step 1 — Choose what to explore", className="step-title"),
+                                        html.P(
+                                            "Pick either a metabolite or a bacteria. Selecting one clears the other.",
+                                            className="step-hint",
+                                        ),
+                                        html.Label("Select Metabolite:", className="select-label"),
+                                        # No dcc.Loading wrapper here: the options callback fires on
+                                        # every keystroke (server-side search), and a loading overlay
+                                        # would steal focus from the search input on each fire.
+                                        dcc.Dropdown(
+                                            id="selected-metabolite-gmm-b",
+                                            options=[],
+                                            placeholder="Select Metabolite",
+                                            searchable=True,
+                                            clearable=True,
+                                            multi=False,
+                                            style={"width": "100%"},
+                                            className="select-input",
+                                        ),
+                                        html.Div("— OR —", className="or-divider"),
+                                        html.Label("Select Bacteria:", className="select-label"),
+                                        dcc.Dropdown(
+                                            id="selected-bacteria-gmm-b",
+                                            options=[],
+                                            placeholder="Select Bacteria",
+                                            searchable=True,
+                                            clearable=True,
+                                            multi=False,
+                                            style={"width": "100%"},
+                                            className="select-input",
+                                        ),
+                                    ], className="step-card"),
+                                    html.Div([
+                                        html.H6("Step 2 — Filter & view", className="step-title"),
+                                        html.P(
+                                            "These filters apply to your current selection.",
+                                            className="step-hint",
+                                        ),
+                                        html.Label("Filter Metabolites by Type:", className="select-label"),
+                                        dbc.RadioItems(
+                                            id="type-filter-radio-b",
+                                            options=[
+                                                {"label": "By Name", "value": "by_name"},
+                                                {"label": "By Positive", "value": "by_positive"},
+                                                {"label": "By Negative", "value": "by_negative"},
+                                                {"label": "All Types", "value": "all"}
+                                            ],
+                                            value="all",
+                                            inline=True,
+                                            className="select-input radio-horizontal",
+                                        ),
+                                        html.Label("Show:", className="select-label"),
+                                        dbc.RadioItems(
+                                            id="top-bottom-radio-b",
+                                            options=[
+                                                {"label": "All", "value": "all"},
+                                                {"label": "Top 10", "value": "top"},
+                                                {"label": "Bottom 10", "value": "bottom"}
+                                            ],
+                                            value="all",
+                                            inline=True,
+                                            className="select-input radio-horizontal",
+                                        ),
+                                    ], className="step-card"),
                                     create_loading_wrapper(
                                         "gmm-scatter-b",
                                         [

@@ -446,6 +446,38 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
 
 .select-input { margin-bottom: 1rem; }
 
+/* Step-numbered cards used by the In Vitro / In Vivo scatter sections to make
+   the "pick one of two dropdowns, then apply filters" flow explicit. */
+.step-card {
+    background: var(--bg-card-quiet);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    padding: 1.25rem 1.5rem 1.5rem;
+    margin: 1rem 0 1.5rem;
+}
+.step-card .select-label:first-of-type { margin-top: 0.75rem; }
+.step-title {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--ink-800);
+    letter-spacing: 0.02em;
+    margin: 0 0 0.25rem;
+}
+.step-hint {
+    font-size: 0.82rem;
+    color: var(--ink-500);
+    margin: 0 0 0.5rem;
+}
+.or-divider {
+    text-align: center;
+    color: var(--ink-400);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    margin: 0.75rem 0 0.25rem;
+}
+
 /* Dash dropdown (react-select v1 markup) */
 .Select-control,
 .Select.is-open > .Select-control {
