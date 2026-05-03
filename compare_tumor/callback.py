@@ -385,7 +385,7 @@ def register_callbacks(app):
                     hovertemplate=(
                         "<b>Bacteria</b>: %{customdata[0]}<br>"
                         "<b>Metabolite</b>: %{customdata[1]}<br>"
-                        "<b>Value</b>: %{y:.2f}<extra></extra>"
+                        "<b>Value</b>: %{y:.4f}<extra></extra>"
                     ),
                 )
             )
@@ -532,7 +532,7 @@ def register_callbacks(app):
                     hovertemplate=(
                         "<b>Bacteria</b>: %{customdata[0]}<br>"
                         "<b>Metabolite</b>: %{customdata[1]}<br>"
-                        "<b>Value</b>: %{y:.2f}<extra></extra>"
+                        "<b>Value</b>: %{y:.4f}<extra></extra>"
                     ),
                 )
             )
@@ -716,7 +716,7 @@ def register_callbacks(app):
                     hovertemplate=(
                         "<b>Bacteria</b>: %{customdata[0]}<br>"
                         "<b>Metabolite</b>: %{customdata[1]}<br>"
-                        "<b>Value</b>: %{y:.2f}<extra></extra>"
+                        "<b>Value</b>: %{y:.4f}<extra></extra>"
                     ),
                 )
             )
@@ -956,7 +956,7 @@ def register_callbacks(app):
                 ),
                 hovertemplate=(
                     f"<b>{x_title}</b>: %{{x}}<br>" +
-                    "<b>Value</b>: %{y:.2f}<br>" +
+                    "<b>Value</b>: %{y:.4f}<br>" +
                     "<extra></extra>"
                 )
             )
@@ -1092,7 +1092,7 @@ def register_callbacks(app):
             if show_cell_text:
                 heatmap_kwargs.update(
                     text=heatmap_data.values,
-                    texttemplate="%{text:.2f}",
+                    texttemplate="%{text:.4f}",
                     textfont={"size": 10},
                 )
 
@@ -1189,7 +1189,7 @@ def register_callbacks(app):
             if show_cell_text:
                 heatmap_kwargs.update(
                     text=heatmap_data.values,
-                    texttemplate="%{text:.2f}",
+                    texttemplate="%{text:.4f}",
                     textfont={"size": 10},
                 )
 

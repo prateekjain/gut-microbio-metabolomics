@@ -310,7 +310,7 @@ def create_tumor_vs_normal_plot(
             'y': 0.98,
             'xref': 'paper',
             'yref': 'paper',
-            'text': f"FDR: {significance_stars}<br>LogFC: {log_fc:.2f}",
+            'text': f"FDR: {significance_stars}<br>LogFC: {log_fc:.4f}",
             'align': 'right',
             'showarrow': False,
             'font': {'size': 11, 'color': 'black'},
@@ -524,7 +524,7 @@ def create_enhanced_heatmap(
         colorscale=colorscale,
         colorbar={'title': 'Value'},
         text=data.values,
-        texttemplate='%{text:.2f}',
+        texttemplate='%{text:.4f}',
         textfont={'size': 10},
         hoverongaps=False
     ))
@@ -712,7 +712,7 @@ def create_dynamic_scatter_plot(data, plot_type="metabolite", title="", top_bott
     hovertemplate = (
         "<b>Bacteria</b>: %{customdata[0]}<br>"
         "<b>Metabolite</b>: %{customdata[1]}<br>"
-        "<b>Value</b>: %{y:.2f}<extra></extra>"
+        "<b>Value</b>: %{y:.4f}<extra></extra>"
     )
 
     def _add_trace(sub, name, color):
