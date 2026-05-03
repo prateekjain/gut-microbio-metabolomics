@@ -700,28 +700,71 @@ def get_metabolite_data(table_name, metabolite):
 @memory_logger("get_bacteria_data: Memory")
 @log_time("get_bacteria_data: DB Query")
 @simple_cache(max_size=100, ttl=300)  # Cache bacteria data for 5 minutes
-def get_bacteria_data(table_name, bacteria):
-    """Fetch all metabolite values for a specific bacteria"""
+def get_bacteria_data(table_name, bacteria, type_filter=None, top_bottom="all", limit=10):
+    """
+    Fetch metabolite values for a single bacteria, optionally filtered by Type
+    and/or sliced to top/bottom N by value.
+
+    Returns a DataFrame with columns ['metabolite', 'value', 'bacteria', 'name'],
+    where `metabolite` is the human-readable label (Column E) when the table has
+    a metabolite column, falling back to `name` (Column A) otherwise. `name` is
+    always present so callers can still address rows by their stable identifier.
+    """
     try:
         with get_db_connection() as cursor:
-            # Quote the bacteria column name properly
+            # Bacteria comes from a controlled dropdown; still validate to keep
+            # the f-string interpolation tight.
+            if not bacteria or not bacteria.replace('_', '').isalnum():
+                logging.error(f"Invalid bacteria column: {bacteria!r}")
+                return None
             quoted_bacteria = f'"{bacteria}"'
-            query = f"""
-            SELECT name, {quoted_bacteria} as value 
-            FROM {table_name} 
-            WHERE {quoted_bacteria} IS NOT NULL
-            """
-            
-            cursor.execute(query)
+
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = %s AND column_name IN ('metabolite', 'Type')",
+                (table_name,),
+            )
+            present = {row[0] for row in cursor.fetchall()}
+            has_metabolite = 'metabolite' in present
+            has_type = 'Type' in present
+
+            label_expr = "COALESCE(metabolite, name)" if has_metabolite else "name"
+
+            where = [f"{quoted_bacteria} IS NOT NULL"]
+            params = []
+            if has_type and type_filter in _TYPE_FILTER_VALUES:
+                where.append('"Type" = %s')
+                params.append(type_filter)
+
+            order_clause = ""
+            limit_clause = ""
+            if top_bottom == "top":
+                order_clause = f"ORDER BY {quoted_bacteria} DESC"
+                limit_clause = "LIMIT %s"
+                params.append(limit)
+            elif top_bottom == "bottom":
+                order_clause = f"ORDER BY {quoted_bacteria} ASC"
+                limit_clause = "LIMIT %s"
+                params.append(limit)
+
+            query = (
+                f"SELECT name, {label_expr} AS metabolite_label, "
+                f"{quoted_bacteria} AS value "
+                f"FROM {table_name} "
+                f"WHERE {' AND '.join(where)} "
+                f"{order_clause} {limit_clause}"
+            ).strip()
+
+            cursor.execute(query, params)
             data = cursor.fetchall()
-            
-            df = pd.DataFrame(data, columns=['metabolite', 'value'])
+
+            df = pd.DataFrame(data, columns=['name', 'metabolite', 'value'])
             df['bacteria'] = bacteria
             return df
 
     except Exception as e:
         logging.error("Error fetching bacteria data: %s", e)
-        return None                       
+        return None
             
 @log_time("get_column_names: DB Query")
 @simple_cache(max_size=20, ttl=600)  # Cache column names for 10 minutes

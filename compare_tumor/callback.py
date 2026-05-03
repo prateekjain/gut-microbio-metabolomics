@@ -299,60 +299,55 @@ def register_callbacks(app):
         Output("gmm-scatter-plot-b", "figure")],
         [Input("selected-metabolite-gmm-b", "value"),
         Input("selected-bacteria-gmm-b", "value"),
-        Input("top-bottom-radio-b", "value")] 
+        Input("top-bottom-radio-b", "value"),
+        Input("type-filter-radio-b", "value")]
     )
     @memory_logger("update_scatter_plot_b: Memory")
     @performance_logger
-    def update_scatter_plot_b(selected_metabolite, selected_bacteria, top_bottom):
+    def update_scatter_plot_b(selected_metabolite, selected_bacteria, top_bottom, type_filter):
         ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
-        
-        logging.info(f"Triggered by (Tab B): {triggered_id}")
+
+        logging.info(
+            f"Triggered by (Tab B): {triggered_id} "
+            f"(metabolite={selected_metabolite}, bacteria={selected_bacteria}, "
+            f"top_bottom={top_bottom}, type_filter={type_filter})"
+        )
         table_name = get_table_name_from_tab("tab-b")
 
         try:
-            # Initialize variables
+            # The two dropdowns toggle each other: picking one clears the other.
+            # Radio inputs (type_filter, top_bottom) just re-fire the callback so
+            # we re-query with whichever dropdown is currently active.
+            if triggered_id == "selected-metabolite-gmm-b" and selected_metabolite:
+                selected_bacteria = None
+            elif triggered_id == "selected-bacteria-gmm-b" and selected_bacteria:
+                selected_metabolite = None
+
             df = None
             plot_type = None
 
-            # Handle dropdown triggers
-            if triggered_id == "selected-metabolite-gmm-b" and selected_metabolite:
-                selected_bacteria = None  # Reset bacteria dropdown
+            if selected_metabolite:
                 plot_type = "metabolite"
-                
-                # Apply radio button filter for metabolite view
                 if top_bottom == "top":
                     df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
                 elif top_bottom == "bottom":
                     df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
-                else:  # "all"
-                    df = get_metabolite_data(table_name, selected_metabolite)
-
-            elif triggered_id == "selected-bacteria-gmm-b" and selected_bacteria:
-                selected_metabolite = None  # Reset metabolite dropdown
-                plot_type = "bacteria"
-                df = get_bacteria_data(table_name, selected_bacteria)
-                
-            # Handle radio button trigger
-            elif triggered_id == "top-bottom-radio-b":
-                logging.info(f"Radio button triggered with metabolite: {selected_metabolite}, filter: {top_bottom}")
-                if selected_metabolite:
-                    plot_type = "metabolite"
-                    if top_bottom == "top":
-                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
-                        logging.info(f"Top 10 data shape: {df.shape if df is not None else 'None'}")
-                    elif top_bottom == "bottom":
-                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
-                        logging.info(f"Bottom 10 data shape: {df.shape if df is not None else 'None'}")
-                    else:  # "all"
-                        df = get_metabolite_data(table_name, selected_metabolite)
-                        logging.info(f"All data shape: {df.shape if df is not None else 'None'}")
                 else:
-                    return None, None, create_empty_figure("No Metabolite Selected", 
-                                                        "Please select a metabolite first, then choose top/bottom filter")
+                    df = get_metabolite_data(table_name, selected_metabolite)
+            elif selected_bacteria:
+                plot_type = "bacteria"
+                df = get_bacteria_data(
+                    table_name,
+                    selected_bacteria,
+                    type_filter=type_filter,
+                    top_bottom=top_bottom,
+                )
             else:
-                return None, None, create_empty_figure("No Selection", 
-                                                    "Please select either a metabolite or bacteria")
+                return None, None, create_empty_figure(
+                    "No Selection",
+                    "Please select either a metabolite or bacteria"
+                )
 
             if df is None or df.empty:
                 return (selected_metabolite, selected_bacteria, 
@@ -448,61 +443,54 @@ def register_callbacks(app):
         Output("gmm-scatter-plot-a", "figure")],
         [Input("selected-metabolite-gmm-a", "value"),
         Input("selected-bacteria-gmm-a", "value"),
-        Input("top-bottom-radio-a", "value")],
+        Input("top-bottom-radio-a", "value"),
+        Input("type-filter-radio-a", "value")],
         prevent_initial_call=True  # Prevent initial callback execution
     )
     @memory_logger("update_scatter_plot_a: Memory")
     @performance_logger
-    def update_scatter_plot_a(selected_metabolite, selected_bacteria, top_bottom):
+    def update_scatter_plot_a(selected_metabolite, selected_bacteria, top_bottom, type_filter):
         ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
-        
-        logging.info(f"Triggered by (Tab A): {triggered_id}")
+
+        logging.info(
+            f"Triggered by (Tab A): {triggered_id} "
+            f"(metabolite={selected_metabolite}, bacteria={selected_bacteria}, "
+            f"top_bottom={top_bottom}, type_filter={type_filter})"
+        )
         table_name = get_table_name_from_tab("tab-a")
 
         try:
-            # Initialize variables
+            # See update_scatter_plot_b for the toggling/radio rationale.
+            if triggered_id == "selected-metabolite-gmm-a" and selected_metabolite:
+                selected_bacteria = None
+            elif triggered_id == "selected-bacteria-gmm-a" and selected_bacteria:
+                selected_metabolite = None
+
             df = None
             plot_type = None
 
-            # Handle dropdown triggers
-            if triggered_id == "selected-metabolite-gmm-a" and selected_metabolite:
-                selected_bacteria = None  # Reset bacteria dropdown
+            if selected_metabolite:
                 plot_type = "metabolite"
-                
-                # Apply radio button filter for metabolite view
                 if top_bottom == "top":
                     df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
                 elif top_bottom == "bottom":
                     df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
-                else:  # "all"
-                    df = get_metabolite_data(table_name, selected_metabolite)
-
-            elif triggered_id == "selected-bacteria-gmm-a" and selected_bacteria:
-                selected_metabolite = None  # Reset metabolite dropdown
-                plot_type = "bacteria"
-                df = get_bacteria_data(table_name, selected_bacteria)
-                
-            # Handle radio button trigger
-            elif triggered_id == "top-bottom-radio-a":
-                logging.info(f"Radio button triggered with metabolite: {selected_metabolite}, filter: {top_bottom}")
-                if selected_metabolite:
-                    plot_type = "metabolite"
-                    if top_bottom == "top":
-                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "desc")
-                        logging.info(f"Top 10 data shape: {df.shape if df is not None else 'None'}")
-                    elif top_bottom == "bottom":
-                        df = get_top_bottom_bacteria_values(table_name, selected_metabolite, 10, "asc")
-                        logging.info(f"Bottom 10 data shape: {df.shape if df is not None else 'None'}")
-                    else:  # "all"
-                        df = get_metabolite_data(table_name, selected_metabolite)
-                        logging.info(f"All data shape: {df.shape if df is not None else 'None'}")
                 else:
-                    return None, None, create_empty_figure("No Metabolite Selected", 
-                                                        "Please select a metabolite first, then choose top/bottom filter")
+                    df = get_metabolite_data(table_name, selected_metabolite)
+            elif selected_bacteria:
+                plot_type = "bacteria"
+                df = get_bacteria_data(
+                    table_name,
+                    selected_bacteria,
+                    type_filter=type_filter,
+                    top_bottom=top_bottom,
+                )
             else:
-                return None, None, create_empty_figure("No Selection", 
-                                                    "Please select either a metabolite or bacteria")
+                return None, None, create_empty_figure(
+                    "No Selection",
+                    "Please select either a metabolite or bacteria"
+                )
 
             if df is None or df.empty:
                 return (selected_metabolite, selected_bacteria, 
