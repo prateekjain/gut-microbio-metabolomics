@@ -396,7 +396,11 @@ def register_callbacks(app):
                 yaxis_title="Values",
                 template="plotly_white",
                 width=scatter_width,
-                height=400,  # Fixed height for horizontal scrolling
+                # Tall enough to give the y-axis usable resolution after the
+                # dynamic bottom margin (up to ~200 px) eats into the area for
+                # the rotated x-axis labels. At 400 px the chart drawing area
+                # collapses to ~150 px, which crushes the y-axis ticks.
+                height=600,
                 autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
                     tickangle=90,
@@ -539,7 +543,11 @@ def register_callbacks(app):
                 yaxis_title="Values",
                 template="plotly_white",
                 width=scatter_width,
-                height=400,  # Fixed height for horizontal scrolling
+                # Tall enough to give the y-axis usable resolution after the
+                # dynamic bottom margin (up to ~200 px) eats into the area for
+                # the rotated x-axis labels. At 400 px the chart drawing area
+                # collapses to ~150 px, which crushes the y-axis ticks.
+                height=600,
                 autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
                     tickangle=90,
@@ -719,7 +727,11 @@ def register_callbacks(app):
                 yaxis_title="Values",
                 template="plotly_white",
                 width=scatter_width,
-                height=400,  # Fixed height for horizontal scrolling
+                # Tall enough to give the y-axis usable resolution after the
+                # dynamic bottom margin (up to ~200 px) eats into the area for
+                # the rotated x-axis labels. At 400 px the chart drawing area
+                # collapses to ~150 px, which crushes the y-axis ticks.
+                height=600,
                 autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
                     tickangle=90,
