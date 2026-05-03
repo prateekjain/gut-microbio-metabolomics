@@ -556,99 +556,115 @@ def get_multiple_bacteria_top_metabolites(table_name, selected_bacteria, type_fi
 @log_time("get_multiple_bacteria_cumm_top_metabolites: DB Query")
 @simple_cache(max_size=50, ttl=600)  # Cache for 10 minutes as fallback
 def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria, type_filter=None):
+    """
+    Returns metabolites for which every selected bacterium ranks in the *global*
+    top-10 producers (across all bacteria columns in the table). Result is long
+    format: [metabolite, bacteria, value, rank], with rows for the selected
+    bacteria only — one trace per bacterium downstream.
+    """
     if not selected_bacteria:
         return None
 
-    # 3. Run the expensive query as before
     try:
         with get_db_connection() as cursor:
-            # Validate that selected bacteria columns exist
-            cursor.execute(f"""
+            cursor.execute(
+                """
                 SELECT column_name
                 FROM information_schema.columns
                 WHERE table_name = %s
                 AND column_name = ANY(%s)
-            """, (table_name, selected_bacteria))
+                """,
+                (table_name, selected_bacteria),
+            )
 
             valid_bacteria = [row[0] for row in cursor.fetchall()]
             if not valid_bacteria:
                 logging.warning("None of the selected bacteria columns exist in table: %s", table_name)
                 return None
 
-            logging.info("Valid bacteria columns for cumulative analysis: %s (type_filter=%s)", valid_bacteria, type_filter)
+            all_bacteria_columns = get_column_names(table_name)
+            if not all_bacteria_columns:
+                logging.warning("No bacteria columns discovered for table: %s", table_name)
+                return None
+
+            valid_bacteria = [b for b in valid_bacteria if b in all_bacteria_columns]
+            if not valid_bacteria:
+                logging.warning("Selected bacteria are not in the table's bacteria columns: %s", table_name)
+                return None
+
+            logging.info(
+                "Cumulative analysis: %d selected of %d total bacteria columns (type_filter=%s)",
+                len(valid_bacteria), len(all_bacteria_columns), type_filter,
+            )
 
             type_clause = ""
             type_params = ()
             if type_filter in _TYPE_FILTER_VALUES:
                 type_clause = ' AND "Type" = %s'
-                type_params = (type_filter,) * len(valid_bacteria)
+                type_params = (type_filter,)
 
-            # SIMPLIFIED APPROACH: Get metabolites where ALL selected bacteria have values > 0
-            # Then rank them within the selected bacteria only
-
-            # Build the unpivot query only for selected bacteria
-            unpivot_parts = []
-            for bacteria in valid_bacteria:
-                unpivot_parts.append(
-                    f'SELECT name as metabolite, \'{bacteria}\' as bacteria, '
-                    f'"{bacteria}"::double precision as value FROM {table_name} '
-                    f'WHERE "{bacteria}" IS NOT NULL AND "{bacteria}" > 0{type_clause}'
-                )
-            
-            unpivot_query = ' UNION ALL '.join(unpivot_parts)
-            
-            # Simplified query that finds metabolites where ALL selected bacteria have values
-            # and then ranks them within the selected bacteria
-            simplified_query = f"""
-            WITH SelectedBacteriaData AS (
-                {unpivot_query}
-            ),
-            MetabolitesWithAllBacteria AS (
-                SELECT metabolite
-                FROM SelectedBacteriaData
-                GROUP BY metabolite
-                HAVING COUNT(DISTINCT bacteria) = {len(valid_bacteria)}
-            ),
-            RankedBacteria AS (
-                SELECT 
-                    s.metabolite,
-                    s.bacteria,
-                    s.value,
-                    ROW_NUMBER() OVER (PARTITION BY s.metabolite ORDER BY s.value DESC) AS rank
-                FROM SelectedBacteriaData s
-                JOIN MetabolitesWithAllBacteria m ON s.metabolite = m.metabolite
+            # Cheap pre-filter: a metabolite can only qualify if every selected
+            # bacterium has a strictly positive value on its row, so eliminate
+            # rows that fail that check before unpivoting (~9× row reduction
+            # for typical selections on in_vivo).
+            candidate_filter = " AND ".join(
+                f'"{b}" IS NOT NULL AND "{b}" > 0' for b in valid_bacteria
             )
-            SELECT metabolite, bacteria, value, rank
-            FROM RankedBacteria
-            WHERE rank <= 10
-            ORDER BY metabolite, rank;
-            """
-            
-            logging.info("Executing simplified cumulative query for %d selected bacteria", len(valid_bacteria))
 
-            cursor.execute(simplified_query, type_params)
+            lateral_tuples = ", ".join(
+                f"('{col}', t.\"{col}\"::double precision)" for col in all_bacteria_columns
+            )
+
+            # Per-row LATERAL with LIMIT 10 lets Postgres use a heap top-K
+            # instead of sorting all 111 unpivoted values per metabolite.
+            query = f"""
+            WITH Candidates AS (
+                SELECT * FROM {table_name}
+                WHERE {candidate_filter}{type_clause}
+            ),
+            Top10 AS (
+                SELECT t.name AS metabolite, r.bacteria, r.value, r.rank
+                FROM Candidates t
+                CROSS JOIN LATERAL (
+                    SELECT bacteria, value,
+                           ROW_NUMBER() OVER (ORDER BY value DESC) AS rank
+                    FROM (VALUES {lateral_tuples}) AS u(bacteria, value)
+                    WHERE value IS NOT NULL AND value > 0
+                    ORDER BY value DESC
+                    LIMIT 10
+                ) AS r
+            ),
+            Qualifying AS (
+                SELECT metabolite
+                FROM Top10
+                WHERE bacteria = ANY(%s)
+                GROUP BY metabolite
+                HAVING COUNT(DISTINCT bacteria) = %s
+            )
+            SELECT t.metabolite, t.bacteria, t.value, t.rank
+            FROM Top10 t
+            JOIN Qualifying q USING (metabolite)
+            WHERE t.bacteria = ANY(%s)
+            ORDER BY t.metabolite, t.rank;
+            """
+
+            params = type_params + (valid_bacteria, len(valid_bacteria), valid_bacteria)
+            cursor.execute(query, params)
             data = cursor.fetchall()
-            
+
             if not data:
-                logging.warning("No metabolites found where all selected bacteria appear together")
+                logging.warning("No metabolites where all selected bacteria are in global top-10")
                 return None
 
-            # Create DataFrame with optimized memory usage
             columns = ['metabolite', 'bacteria', 'value', 'rank']
             result_df = pd.DataFrame(data, columns=columns)
-
-            # Convert value to numeric efficiently
             result_df['value'] = pd.to_numeric(result_df['value'], errors='coerce')
-            result_df = result_df.dropna(subset=['value'])
+            result_df = result_df.dropna(subset=['value']).reset_index(drop=True)
 
-            # Cap to top-50 metabolites by peak value — see get_multiple_bacteria_top_metabolites
-            # for rationale. Without this the response is ~2.3 MB and the chart wobbles.
-            top_metabolites = (
-                result_df.groupby('metabolite')['value'].max().nlargest(50).index
+            logging.info(
+                "Cumulative analysis completed. Qualifying metabolites: %d, rows: %d",
+                result_df['metabolite'].nunique(), len(result_df),
             )
-            result_df = result_df[result_df['metabolite'].isin(top_metabolites)].reset_index(drop=True)
-
-            logging.info("Cumulative analysis completed. Shape: %s", result_df.shape)
 
             return result_df
 

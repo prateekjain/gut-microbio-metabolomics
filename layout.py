@@ -1073,6 +1073,7 @@ main_layout = dbc.Container(
                 
                 html.Div(
                     className="section-spacing",
+                    style={"display": "none"},
                     children=[
                         html.H2("Top Metabolites Analysis", className="section-heading"),
                         html.P(
@@ -1210,9 +1211,9 @@ main_layout = dbc.Container(
                         ], id="top-tabs", value="top-tab-a", className="tabs"),
                     ]
                 ),
-                
-                html.Div(className="border-line"),
-                
+
+                html.Div(className="border-line", style={"display": "none"}),
+
                 html.Div(
                     className="section-spacing",
                     children=[
