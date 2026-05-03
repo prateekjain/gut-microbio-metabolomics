@@ -712,11 +712,6 @@ main_layout = dbc.Container(
                             dbc.Row([
                                 dbc.Col([
                                     html.Div([
-                                        html.H6("Step 1 — Choose what to explore", className="step-title"),
-                                        html.P(
-                                            "Pick either a metabolite or a bacteria. Selecting one clears the other.",
-                                            className="step-hint",
-                                        ),
                                         html.Label("Select Metabolite:", className="select-label"),
                                         create_loading_wrapper(
                                             "metabolite-dropdown-a",
@@ -749,11 +744,6 @@ main_layout = dbc.Container(
                                         ),
                                     ], className="step-card"),
                                     html.Div([
-                                        html.H6("Step 2 — Filter & view", className="step-title"),
-                                        html.P(
-                                            "These filters apply to your current selection.",
-                                            className="step-hint",
-                                        ),
                                         html.Label("Filter Metabolites by Type:", className="select-label"),
                                         dbc.RadioItems(
                                             id="type-filter-radio-a",
@@ -812,11 +802,6 @@ main_layout = dbc.Container(
                             dbc.Row([
                                 dbc.Col([
                                     html.Div([
-                                        html.H6("Step 1 — Choose what to explore", className="step-title"),
-                                        html.P(
-                                            "Pick either a metabolite or a bacteria. Selecting one clears the other.",
-                                            className="step-hint",
-                                        ),
                                         html.Label("Select Metabolite:", className="select-label"),
                                         # No dcc.Loading wrapper here: the options callback fires on
                                         # every keystroke (server-side search), and a loading overlay
@@ -845,11 +830,6 @@ main_layout = dbc.Container(
                                         ),
                                     ], className="step-card"),
                                     html.Div([
-                                        html.H6("Step 2 — Filter & view", className="step-title"),
-                                        html.P(
-                                            "These filters apply to your current selection.",
-                                            className="step-hint",
-                                        ),
                                         html.Label("Filter Metabolites by Type:", className="select-label"),
                                         dbc.RadioItems(
                                             id="type-filter-radio-b",

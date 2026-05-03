@@ -446,10 +446,9 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
 
 .select-input { margin-bottom: 1rem; }
 
-/* Step-numbered sections used by the In Vitro / In Vivo scatter views to make
-   the "pick one of two dropdowns, then apply filters" flow explicit. The tab
-   body already provides the surrounding card chrome, so steps are flat —
-   typography + a hairline divider does the visual grouping. */
+/* Two flat groupings on the In Vitro / In Vivo scatter views — the
+   selection (two dropdowns) and the filters (two radio rows) — separated
+   only by a hairline so they read as one continuous form. */
 .step-card {
     padding: 0;
     margin: 0;
@@ -460,19 +459,6 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     border-top: 1px solid var(--border-soft);
 }
 .step-card .select-label:first-of-type { margin-top: 0.5rem; }
-.step-title {
-    font-family: var(--font-sans);
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--ink-800);
-    letter-spacing: 0;
-    margin: 0 0 0.15rem;
-}
-.step-hint {
-    font-size: 0.82rem;
-    color: var(--ink-500);
-    margin: 0 0 0.25rem;
-}
 .or-divider {
     text-align: center;
     color: var(--ink-400);
