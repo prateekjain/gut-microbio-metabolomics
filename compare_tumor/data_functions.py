@@ -603,6 +603,18 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria, ty
                 type_clause = ' AND "Type" = %s'
                 type_params = (type_filter,)
 
+            # Prefer the human-readable `metabolite` column (spreadsheet col E
+            # on in_vivo) for the x-axis label; fall back to `name` (LC-MS
+            # feature id) for tables that don't have it (e.g. gmm_test_1).
+            cursor.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = %s AND column_name = 'metabolite'
+                """,
+                (table_name,),
+            )
+            display_expr = 't."metabolite"' if cursor.fetchone() else 't.name'
+
             # Cheap pre-filter: a metabolite can only qualify if every selected
             # bacterium has a strictly positive value on its row, so eliminate
             # rows that fail that check before unpivoting (~9× row reduction
@@ -617,13 +629,17 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria, ty
 
             # Per-row LATERAL with LIMIT 10 lets Postgres use a heap top-K
             # instead of sorting all 111 unpivoted values per metabolite.
+            # `metabolite_key` (= name) keeps grouping correct when display
+            # names are not guaranteed unique; `metabolite` is the label.
             query = f"""
             WITH Candidates AS (
                 SELECT * FROM {table_name}
                 WHERE {candidate_filter}{type_clause}
             ),
             Top10 AS (
-                SELECT t.name AS metabolite, r.bacteria, r.value, r.rank
+                SELECT t.name AS metabolite_key,
+                       {display_expr} AS metabolite,
+                       r.bacteria, r.value, r.rank
                 FROM Candidates t
                 CROSS JOIN LATERAL (
                     SELECT bacteria, value,
@@ -635,15 +651,15 @@ def get_multiple_bacteria_cumm_top_metabolites(table_name, selected_bacteria, ty
                 ) AS r
             ),
             Qualifying AS (
-                SELECT metabolite
+                SELECT metabolite_key
                 FROM Top10
                 WHERE bacteria = ANY(%s)
-                GROUP BY metabolite
+                GROUP BY metabolite_key
                 HAVING COUNT(DISTINCT bacteria) = %s
             )
             SELECT t.metabolite, t.bacteria, t.value, t.rank
             FROM Top10 t
-            JOIN Qualifying q USING (metabolite)
+            JOIN Qualifying q USING (metabolite_key)
             WHERE t.bacteria = ANY(%s)
             ORDER BY t.metabolite, t.rank;
             """
