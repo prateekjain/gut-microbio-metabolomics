@@ -1244,10 +1244,9 @@ def register_callbacks(app):
     @performance_logger
     def update_metabolite_options_a(type_filter):
         try:
-            from .data_functions import get_gmm_name_by_type
+            from .data_functions import get_gmm_name_options_by_type
             table_name = get_table_name_for_component("selected-metabolite-gmm-a")
-            metabolites = get_gmm_name_by_type(table_name, type_filter)
-            return [{"label": name, "value": name} for name in metabolites]
+            return get_gmm_name_options_by_type(table_name, type_filter)
         except Exception as e:
             logging.error(f"Error updating metabolite options for Tab A: {e}")
             return []
@@ -1260,12 +1259,11 @@ def register_callbacks(app):
     @performance_logger
     def update_metabolite_options_b(type_filter):
         try:
-            from .data_functions import get_gmm_name_by_type
+            from .data_functions import get_gmm_name_options_by_type
             table_name = get_table_name_for_component("selected-metabolite-gmm-b")
             # in_vivo has ~81k distinct metabolites — cap to keep the dropdown usable
             # and the response payload small. Server-side search can be added later.
-            metabolites = list(get_gmm_name_by_type(table_name, type_filter))[:1000]
-            return [{"label": name, "value": name} for name in metabolites]
+            return list(get_gmm_name_options_by_type(table_name, type_filter))[:1000]
         except Exception as e:
             logging.error(f"Error updating metabolite options for Tab B: {e}")
             return []
@@ -1278,11 +1276,11 @@ def register_callbacks(app):
     @performance_logger
     def update_metabolite_options_heatmap_a(type_filter):
         try:
-            from .data_functions import get_gmm_name_by_type
+            from .data_functions import get_gmm_name_options_by_type
             table_name = "gmm_test_1"
-            metabolites = get_gmm_name_by_type(table_name, type_filter)
-            print(f"[DEBUG] Heatmap A metabolite options updated. Type: {type_filter}, Count: {len(metabolites)}")
-            return [{"label": name, "value": name} for name in metabolites]
+            options = get_gmm_name_options_by_type(table_name, type_filter)
+            print(f"[DEBUG] Heatmap A metabolite options updated. Type: {type_filter}, Count: {len(options)}")
+            return options
         except Exception as e:
             logging.error(f"Error updating metabolite options for In Vitro Heatmap: {e}")
             print(f"[DEBUG] Error updating metabolite options for In Vitro Heatmap: {e}")
@@ -1296,11 +1294,10 @@ def register_callbacks(app):
     @performance_logger
     def update_metabolite_options_heatmap_b(type_filter):
         try:
-            from .data_functions import get_gmm_name_by_type
+            from .data_functions import get_gmm_name_options_by_type
             table_name = "in_vivo"
             # Cap to 1000 — see update_metabolite_options_b for rationale.
-            metabolites = list(get_gmm_name_by_type(table_name, type_filter))[:1000]
-            return [{"label": name, "value": name} for name in metabolites]
+            return list(get_gmm_name_options_by_type(table_name, type_filter))[:1000]
         except Exception as e:
             logging.error(f"Error updating metabolite options for In Vivo Heatmap: {e}")
             return []

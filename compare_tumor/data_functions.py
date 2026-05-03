@@ -1562,6 +1562,71 @@ def get_gmm_name_by_type(table_name, type_filter="all"):
         return get_gmm_name(table_name)
 
 
+@log_time("get_gmm_name_options_by_type: DB Query")
+@simple_cache(max_size=20, ttl=600)
+def get_gmm_name_options_by_type(table_name, type_filter="all"):
+    """
+    Returns dropdown options [{label, value}, ...] for the metabolite picker.
+
+    For tables that carry a `metabolite` column (currently in_vivo) the label is
+    the human-readable metabolite text (Column E in the source spreadsheet) and
+    the value stays as `name` (Column A) so downstream queries that match on
+    `name` continue to work unchanged. For tables without a `metabolite` column
+    (e.g. gmm_test_1) the label and value are both `name`.
+    """
+    try:
+        with get_db_connection() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = %s",
+                (table_name,),
+            )
+            if cursor.fetchone() is None:
+                logging.error(f"Table '{table_name}' does not exist")
+                return []
+
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = %s AND column_name IN ('metabolite', 'Type')",
+                (table_name,),
+            )
+            present = {row[0] for row in cursor.fetchall()}
+            has_metabolite = 'metabolite' in present
+            has_type = 'Type' in present
+
+            if not has_metabolite:
+                names = get_gmm_name_by_type(table_name, type_filter)
+                return [{"label": n, "value": n} for n in names]
+
+            if has_type and type_filter in _TYPE_FILTER_VALUES:
+                cursor.execute(
+                    f'SELECT DISTINCT "name", "metabolite" FROM "{table_name}" '
+                    f'WHERE "Type" = %s AND "name" IS NOT NULL '
+                    f'ORDER BY "metabolite" NULLS LAST, "name"',
+                    (type_filter,),
+                )
+            else:
+                cursor.execute(
+                    f'SELECT DISTINCT "name", "metabolite" FROM "{table_name}" '
+                    f'WHERE "name" IS NOT NULL '
+                    f'ORDER BY "metabolite" NULLS LAST, "name"'
+                )
+
+            rows = cursor.fetchall()
+            options = [{"label": (m if m else n), "value": n} for n, m in rows]
+            logging.info(
+                f"Retrieved {len(options)} metabolite options for type "
+                f"'{type_filter}' from table '{table_name}'"
+            )
+            return options
+
+    except Exception as e:
+        logging.error(
+            f"Error getting metabolite options by type from table '{table_name}': {e}"
+        )
+        names = get_gmm_name_by_type(table_name, type_filter)
+        return [{"label": n, "value": n} for n in names]
+
+
 def debug_table_structure(table_name):
     """
     Debug function to inspect table structure and sample data.
