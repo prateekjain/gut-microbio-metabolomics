@@ -1627,6 +1627,107 @@ def get_gmm_name_options_by_type(table_name, type_filter="all"):
         return [{"label": n, "value": n} for n in names]
 
 
+@log_time("search_gmm_name_options: DB Query")
+@simple_cache(max_size=200, ttl=300)
+def search_gmm_name_options(
+    table_name,
+    type_filter="all",
+    search="",
+    limit=100,
+    include_values=(),
+):
+    """
+    Server-side search for the metabolite dropdown.
+
+    Returns up to `limit` `{label, value}` options matching `search` (case
+    insensitive substring against `metabolite` and `name`), filtered by Type.
+    Any values in `include_values` are always returned alongside matches so
+    already-selected items keep their labels in the rendered dropdown chips.
+
+    For tables without a `metabolite` column the search runs against `name`
+    only and labels equal values.
+    """
+    include_values = tuple(include_values or ())
+    try:
+        with get_db_connection() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = %s",
+                (table_name,),
+            )
+            if cursor.fetchone() is None:
+                logging.error(f"Table '{table_name}' does not exist")
+                return []
+
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = %s AND column_name IN ('metabolite', 'Type')",
+                (table_name,),
+            )
+            present = {row[0] for row in cursor.fetchall()}
+            has_metabolite = 'metabolite' in present
+            has_type = 'Type' in present
+
+            where = ['"name" IS NOT NULL']
+            params = []
+            if has_type and type_filter in _TYPE_FILTER_VALUES:
+                where.append('"Type" = %s')
+                params.append(type_filter)
+            if search:
+                pattern = f"%{search}%"
+                if has_metabolite:
+                    where.append('("metabolite" ILIKE %s OR "name" ILIKE %s)')
+                    params.extend([pattern, pattern])
+                else:
+                    where.append('"name" ILIKE %s')
+                    params.append(pattern)
+
+            select_cols = '"name", "metabolite"' if has_metabolite else '"name", "name"'
+            order_by = (
+                '"metabolite" NULLS LAST, "name"' if has_metabolite else '"name"'
+            )
+            query = (
+                f'SELECT DISTINCT {select_cols} FROM "{table_name}" '
+                f'WHERE {" AND ".join(where)} '
+                f'ORDER BY {order_by} LIMIT %s'
+            )
+            cursor.execute(query, params + [limit])
+            rows = cursor.fetchall()
+
+            seen = set()
+            options = []
+            for n, m in rows:
+                if n in seen:
+                    continue
+                seen.add(n)
+                options.append({"label": (m if m else n), "value": n})
+
+            missing = [v for v in include_values if v not in seen]
+            if missing:
+                cursor.execute(
+                    f'SELECT DISTINCT {select_cols} FROM "{table_name}" '
+                    f'WHERE "name" = ANY(%s)',
+                    (list(missing),),
+                )
+                for n, m in cursor.fetchall():
+                    if n in seen:
+                        continue
+                    seen.add(n)
+                    options.append({"label": (m if m else n), "value": n})
+
+            logging.info(
+                f"search_gmm_name_options table={table_name} type={type_filter} "
+                f"search={search!r} limit={limit} include={len(include_values)} "
+                f"-> {len(options)} options"
+            )
+            return options
+
+    except Exception as e:
+        logging.error(
+            f"Error in search_gmm_name_options for table '{table_name}': {e}"
+        )
+        return []
+
+
 def debug_table_structure(table_name):
     """
     Debug function to inspect table structure and sample data.

@@ -1251,19 +1251,32 @@ def register_callbacks(app):
             logging.error(f"Error updating metabolite options for Tab A: {e}")
             return []
 
-    # Callback to update metabolite dropdown options based on type filter for Tab B
+    # Callback to update metabolite dropdown options for Tab B (server-side search).
+    # in_vivo has ~82k distinct metabolites; we never load them all. Each keystroke
+    # in the dropdown's search box re-runs the query and returns up to `limit`
+    # matches. Currently selected values are passed through `include_values` so
+    # they keep their labels when filtered out by the active search.
     @app.callback(
         Output("selected-metabolite-gmm-b", "options"),
-        [Input("type-filter-radio-b", "value")]
+        [Input("type-filter-radio-b", "value"),
+         Input("selected-metabolite-gmm-b", "search_value")],
+        [State("selected-metabolite-gmm-b", "value")],
     )
     @performance_logger
-    def update_metabolite_options_b(type_filter):
+    def update_metabolite_options_b(type_filter, search_value, current_value):
         try:
-            from .data_functions import get_gmm_name_options_by_type
+            from .data_functions import search_gmm_name_options
             table_name = get_table_name_for_component("selected-metabolite-gmm-b")
-            # in_vivo has ~81k distinct metabolites — cap to keep the dropdown usable
-            # and the response payload small. Server-side search can be added later.
-            return list(get_gmm_name_options_by_type(table_name, type_filter))[:1000]
+            include = []
+            if current_value:
+                include = current_value if isinstance(current_value, list) else [current_value]
+            return search_gmm_name_options(
+                table_name,
+                type_filter,
+                search=(search_value or ""),
+                limit=100,
+                include_values=tuple(include),
+            )
         except Exception as e:
             logging.error(f"Error updating metabolite options for Tab B: {e}")
             return []
@@ -1286,18 +1299,30 @@ def register_callbacks(app):
             print(f"[DEBUG] Error updating metabolite options for In Vitro Heatmap: {e}")
             return []
 
-    # Callback to update metabolite dropdown options based on type filter for In Vivo Heatmap
+    # Callback to update metabolite dropdown options for In Vivo Heatmap (server-side search).
+    # See update_metabolite_options_b for the rationale; this dropdown is multi-select,
+    # so include_values can be a list of already-selected metabolite names.
     @app.callback(
         Output("selected-metabolites-heatmap-b", "options"),
-        [Input("type-filter-radio-heatmap-b", "value")]
+        [Input("type-filter-radio-heatmap-b", "value"),
+         Input("selected-metabolites-heatmap-b", "search_value")],
+        [State("selected-metabolites-heatmap-b", "value")],
     )
     @performance_logger
-    def update_metabolite_options_heatmap_b(type_filter):
+    def update_metabolite_options_heatmap_b(type_filter, search_value, current_value):
         try:
-            from .data_functions import get_gmm_name_options_by_type
+            from .data_functions import search_gmm_name_options
             table_name = "in_vivo"
-            # Cap to 1000 — see update_metabolite_options_b for rationale.
-            return list(get_gmm_name_options_by_type(table_name, type_filter))[:1000]
+            include = []
+            if current_value:
+                include = current_value if isinstance(current_value, list) else [current_value]
+            return search_gmm_name_options(
+                table_name,
+                type_filter,
+                search=(search_value or ""),
+                limit=100,
+                include_values=tuple(include),
+            )
         except Exception as e:
             logging.error(f"Error updating metabolite options for In Vivo Heatmap: {e}")
             return []
