@@ -14,10 +14,11 @@ import os
 
 # Import optimization components
 from compare_tumor.data_functions import (
-    db_pool, 
-    get_gmm_name, 
+    db_pool,
+    get_gmm_name,
     get_column_names,
-    get_gmm_name_by_type
+    get_gmm_name_by_type,
+    get_in_vivo_feature_counts,
 )
 
 region = ["cecum", "ascending", "transverse",
@@ -81,14 +82,20 @@ def warm_cache():
             # Cache metabolite names for each type
             for type_filter in type_filters:
                 get_gmm_name_by_type(table, type_filter)
-            
+
             # Cache bacteria/column names
             get_column_names(table)
-            
+
             logger.info(f"Cache warmed for table: {table}")
-            
+
         except Exception as e:
             logger.warning(f"Failed to warm cache for table {table}: {e}")
+
+    try:
+        get_in_vivo_feature_counts()
+        logger.info("Cache warmed for in_vivo feature counts")
+    except Exception as e:
+        logger.warning(f"Failed to warm in_vivo feature counts: {e}")
 
 # Run warm-up off the boot path so the dyno binds to the port immediately
 threading.Thread(target=initialize_performance_optimizations, daemon=True).start()
@@ -109,5 +116,5 @@ def display_page(pathname):
 register_callbacks(app)
 
 if __name__ == '__main__':
-    app.run_server(debug=True, use_reloader=False)
+    app.run_server(debug=True, use_reloader=True)
 

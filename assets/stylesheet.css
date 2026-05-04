@@ -196,9 +196,10 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     line-height: 1.75;
     color: var(--ink-700);
     text-align: left;
-    max-width: 68ch;
+    max-width: 90ch;
     margin: 0 auto 1.25rem;
     padding: 0 1.5rem;
+    text-wrap: pretty;
 }
 .para + .para { margin-top: 0; }
 
@@ -306,15 +307,98 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
     margin: 0.85rem auto 0;
 }
 
+.section-subheading {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+    line-height: 1.3;
+    color: var(--ink-700);
+    text-align: center;
+    margin: 0.25rem auto 1.25rem;
+    max-width: var(--maxw-content);
+    padding: 0 1.5rem;
+}
+
 .section-description {
     font-family: var(--font-sans);
     font-size: 1rem;
     line-height: 1.7;
     color: var(--ink-600);
     text-align: center;
-    max-width: 60ch;
+    max-width: 90ch;
     margin: 0 auto 2.5rem;
     padding: 0 1.5rem;
+    text-wrap: pretty;
+}
+
+.section-description-list {
+    text-align: left;
+    list-style: disc;
+    padding-left: 1.4rem;
+    margin: 0.75rem auto 0;
+    max-width: 64ch;
+}
+
+.section-description-list li {
+    margin: 0.4rem 0;
+}
+
+/* Feature cards — 3-up grid used under section sub-headings */
+.feature-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    max-width: var(--maxw-content);
+    margin: 0.5rem auto 2.5rem;
+    padding: 0 1.5rem;
+}
+
+.feature-card {
+    position: relative;
+    background: #fff;
+    border: 1px solid var(--ink-200);
+    border-radius: 12px;
+    padding: 1.5rem 1.4rem 1.4rem;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.feature-card:hover {
+    border-color: var(--yale-blue-300);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px -14px rgba(0, 53, 107, 0.35);
+}
+
+.feature-card__index {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    color: var(--yale-blue-300);
+    margin-bottom: 0.6rem;
+}
+
+.feature-card__label {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    line-height: 1.25;
+    color: var(--ink-900);
+    margin: 0 0 0.45rem;
+}
+
+.feature-card__body {
+    font-family: var(--font-sans);
+    font-size: 0.94rem;
+    line-height: 1.55;
+    color: var(--ink-600);
+    margin: 0;
+}
+
+@media (max-width: 860px) {
+    .feature-cards {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+    }
 }
 
 .main-section,
@@ -857,7 +941,7 @@ a:focus-visible { outline: 2px solid var(--yale-blue-300); outline-offset: 2px; 
 .cell21, .cell22 { vertical-align: top; }
 
 /* Section anchor offsets — so #section1 etc. don't hide under sticky header */
-section[id], div[id^="section"] { scroll-margin-top: 80px; }
+section[id], [id^="section"] { scroll-margin-top: 100px; }
 
 /* Remove the Dash dev "undo/redo" UI in production */
 ._dash-undo-redo { display: none !important; }

@@ -1637,6 +1637,35 @@ def get_gmm_name_by_type(table_name, type_filter="all"):
         return get_gmm_name(table_name)
 
 
+@log_time("get_in_vivo_feature_counts: DB Query")
+@simple_cache(max_size=1, ttl=86400)
+def get_in_vivo_feature_counts():
+    """
+    One-shot count of untargeted in_vivo features split by acquisition mode.
+    Used by the About paragraph on the home page; cached for a day since the
+    in_vivo dataset is effectively static.
+
+    Returns:
+        dict: {"hilic": int, "rplc": int}. Falls back to {"hilic": 0, "rplc": 0}
+        on error so the page still renders.
+    """
+    try:
+        with get_db_connection() as cursor:
+            cursor.execute(
+                'SELECT "Type", COUNT(*) FROM in_vivo '
+                'WHERE "Type" IN (\'by_negative\', \'by_positive\') '
+                'GROUP BY "Type"'
+            )
+            counts = {row[0]: row[1] for row in cursor.fetchall()}
+        return {
+            "hilic": counts.get("by_negative", 0),
+            "rplc": counts.get("by_positive", 0),
+        }
+    except Exception as e:
+        logging.error(f"Error fetching in_vivo feature counts: {e}")
+        return {"hilic": 0, "rplc": 0}
+
+
 @log_time("get_gmm_name_options_by_type: DB Query")
 @simple_cache(max_size=20, ttl=600)
 def get_gmm_name_options_by_type(table_name, type_filter="all"):

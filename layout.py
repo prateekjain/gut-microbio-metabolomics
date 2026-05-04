@@ -47,6 +47,39 @@ region = [
 ]
 
 
+def _about_section():
+    counts = get_in_vivo_feature_counts()
+    hilic = f"{counts['hilic']:,}"
+    rplc = f"{counts['rplc']:,}"
+    return html.Div(
+        className="para",
+        children=[
+            html.P(
+                [
+                    "This database is a comprehensive resource for exploring the metabolic activities of individual gut bacterial species. It integrates data from 310 ",
+                    html.I("in vitro"),
+                    " bacterial cultures and 111 mono-colonized mouse models. All data is visualized as log₂ fold change relative to the appropriate control groups to isolate microbial impact:",
+                ],
+            ),
+            html.Ul(
+                [
+                    html.Li([html.I("In Vitro"), " data is normalized to respective blank media to reflect intrinsic microbial capacity."]),
+                    html.Li([html.I("In Vivo"), " data is normalized to germ-free (GF) controls to identify specific metabolic shifts within the host."]),
+                ]
+            ),
+            html.P(
+                [
+                    "By offering detailed datasets and user-friendly tools, we aim to advance the understanding of gut microbial metabolites and their interactions with the host. This resource encompasses 354 annotated metabolites ",
+                    html.I("in vitro"), " (validated via authentic standards; MSI levels 1 and 2) and 453 annotated metabolites ",
+                    html.I("in vivo"), " (comprising 362 MSI level 1/2 identifications and 91 ",
+                    html.I("in silico"),
+                    f" MSI level 3 annotations). Additionally, the resource provides data on {hilic} untargeted metabolic features acquired in HILIC ESI negative mode and {rplc} features acquired in RPLC ESI positive mode.",
+                ],
+            ),
+        ],
+    )
+
+
 tabs_mz = dcc.Tabs(
     [
             dcc.Tab(
@@ -573,63 +606,37 @@ footer_layout = html.Footer(
 )
 # Define your buttons
 button1 = html.A(
-    "Tumor vs Normal (Metabolite features)",
-    id="btn-mz-h",
+    "Microbial Metabolic Landscape",
+    id="btn-microbial-landscape",
     n_clicks=0,
     className="btn-section btn-center",
     href="#section1",
 )
 button2 = html.A(
-    "Tumor vs Normal (Annotated Metabolites)",
-    id="btn-mz-Mucosa2",
+    "Metabolic Interaction Networks",
+    id="btn-interaction-networks",
     n_clicks=0,
     className="btn-section btn-center",
     href="#section2",
 )
 button3 = html.A(
-    "Inter-subsite comparisons",
-    id="btn-inter-subsite",
+    "Metabolic Co-Occurrence Analysis",
+    id="btn-cooccurrence-analysis",
     n_clicks=0,
     className="btn-section btn-center",
     href="#section3",
-)
-button4 = html.A(
-    "Concentration gradient of metabolites",
-    id="btn-mz-linear",
-    n_clicks=0,
-    className="btn-section btn-center",
-    href="#section4",
-)
-button5 = html.A(
-    "Survival markers",
-    id="btn-mz-Survival",
-    n_clicks=0,
-    className="btn-section btn-center",
-    href="#section5",
 )
 # Put buttons in a table
 button_table = html.Table(
     [
         html.Tr(
             [
-                html.Td(button1, ),  # This cell spans 1 column
-                html.Td(button2, ),  # This cell spans 1 column
-                html.Td(button3, ),  # This cell spans 1 column
+                html.Td(button1),
+                html.Td(button2),
+                html.Td(button3),
             ]
         ),],
     className="table-container"
-)
-
-button_table2 = html.Table([
-        html.Tr(
-            [
-                # This cell spans 1 column
-                html.Td(button4,  className="cell21"),
-                html.Td(button5, className="cell22"),  # This cell spans 1 column
-            ]
-        ),
-    ],
-    className="table-container2"
 )
 
 google_analytics_scripts = html.Div([
@@ -670,22 +677,12 @@ main_layout = dbc.Container(
                     [
                         html.Br(),
                         html.H1(
-                            "Microbiome Metabolome Database",
+                            "MetaNexus: Connecting Microbes to Metabolites",
                             className="title"
                         ),
                         html.P("About", className="about-text"),
-                        html.P(
-                            [
-                                "This database is a comprehensive resource for exploring the metabolic activities of individual gut bacterial species and their roles in human health and disease. "
-                                "It integrates data from 310 in vitro bacterial cultures and 112 monocolonized mouse models, each hosting a single bacterial species, providing insights into species-specific metabolic profiles in both controlled environments and host systems. By comparing in vitro and in vivo metabolomics data, the database highlights key biochemical pathways and their significance in host-microbe interactions, including immune modulation and other physiological processes. ",
-                                html.Br(),
-                                html.Br(),
-                                "By offering detailed datasets and user-friendly tools for analysis and visualization, we aim to advance the understanding of gut microbial metabolites and their interactions with the host. Discover the intricate metabolic landscape of gut bacteria with us and contribute to groundbreaking insights in microbiome research.",
-                            ],
-                            className="para",
-                        ),
+                        _about_section(),
                         button_table,
-                        button_table2,
                         html.Div(className="border-line"),
                     ],
                     md=12,
@@ -696,13 +693,55 @@ main_layout = dbc.Container(
             className="section-spacing",
             children=[
                 html.H2(
-                    "In Vitro vs In Vivo",
+                    "Microbial Metabolic Landscape",
                     className="section-heading",
                     id="section1",
                 ),
+                html.H3(
+                    [html.I("In Vitro"), " vs. ", html.I("In Vivo"), " Comparison"],
+                    className="section-subheading",
+                ),
                 html.P(
-                    "Explore the metabolic differences between controlled laboratory conditions (in vitro) and living host environments (in vivo). Compare bacterial metabolite production across different experimental conditions.",
+                    "Explore the metabolic profiles of gut microbial strains across experimental environments. This interface supports dual-directional querying and comparative analysis.",
                     className="section-description",
+                ),
+                html.Div(
+                    className="feature-cards",
+                    children=[
+                        html.Div(
+                            className="feature-card",
+                            children=[
+                                html.Span("01", className="feature-card__index"),
+                                html.H4("Query by Metabolite", className="feature-card__label"),
+                                html.P(
+                                    "Identify which species produce or consume a specific compound.",
+                                    className="feature-card__body",
+                                ),
+                            ],
+                        ),
+                        html.Div(
+                            className="feature-card",
+                            children=[
+                                html.Span("02", className="feature-card__index"),
+                                html.H4("Query by Species", className="feature-card__label"),
+                                html.P(
+                                    "Characterize the entire metabolic profile of a selected bacterium.",
+                                    className="feature-card__body",
+                                ),
+                            ],
+                        ),
+                        html.Div(
+                            className="feature-card",
+                            children=[
+                                html.Span("03", className="feature-card__index"),
+                                html.H4("Advanced Filtering", className="feature-card__label"),
+                                html.P(
+                                    "Use the “Top/Bottom 10” toggle to isolate the most significant species for a metabolite, or the most altered metabolites for a species.",
+                                    className="feature-card__body",
+                                ),
+                            ],
+                        ),
+                    ],
                 ),
                 dcc.Tabs([
                     dcc.Tab(
@@ -748,9 +787,9 @@ main_layout = dbc.Container(
                                         dbc.RadioItems(
                                             id="type-filter-radio-a",
                                             options=[
-                                                {"label": "By Name", "value": "by_name"},
-                                                {"label": "By Positive", "value": "by_positive"},
-                                                {"label": "By Negative", "value": "by_negative"},
+                                                {"label": "Annotated metabolites", "value": "by_name"},
+                                                {"label": "Positive ions", "value": "by_positive"},
+                                                {"label": "Negative ions", "value": "by_negative"},
                                                 {"label": "All Types", "value": "all"}
                                             ],
                                             value="all",
@@ -834,9 +873,9 @@ main_layout = dbc.Container(
                                         dbc.RadioItems(
                                             id="type-filter-radio-b",
                                             options=[
-                                                {"label": "By Name", "value": "by_name"},
-                                                {"label": "By Positive", "value": "by_positive"},
-                                                {"label": "By Negative", "value": "by_negative"},
+                                                {"label": "Annotated metabolites", "value": "by_name"},
+                                                {"label": "Positive ions", "value": "by_positive"},
+                                                {"label": "Negative ions", "value": "by_negative"},
                                                 {"label": "All Types", "value": "all"}
                                             ],
                                             value="all",
@@ -888,9 +927,16 @@ main_layout = dbc.Container(
                 html.Div(
                     className="section-spacing",
                     children=[
-                        html.H2("Metabolite-Bacteria Heatmap", className="section-heading"),
+                        html.H2("Metabolic Interaction Networks", className="section-heading", id="section2"),
+                        html.H3(
+                            "Community Dynamics & Interaction Mapping",
+                            className="section-subheading",
+                        ),
                         html.P(
-                            "Select multiple bacteria and metabolites to visualize their relationships in an interactive heatmap.",
+                            [
+                                "This section provides a framework to predict community-level dynamics by visualizing multiple species and metabolites simultaneously. By selecting specific bacteria and metabolites, users can observe interaction patterns and functional overlaps to infer the net metabolic balance of microbial consortia. This mapping identifies how individual production and consumption profiles combine to influence overall metabolite levels, with a toggle available to compare these behaviors between ",
+                                html.I("In Vitro"), " and ", html.I("In Vivo"), " environments.",
+                            ],
                             className="section-description",
                         ),
                         
@@ -910,9 +956,9 @@ main_layout = dbc.Container(
                                         dbc.RadioItems(
                                             id="type-filter-radio-heatmap",
                                             options=[
-                                                {"label": "By Name", "value": "by_name"},
-                                                {"label": "By Positive", "value": "by_positive"},
-                                                {"label": "By Negative", "value": "by_negative"},
+                                                {"label": "Annotated metabolites", "value": "by_name"},
+                                                {"label": "Positive ions", "value": "by_positive"},
+                                                {"label": "Negative ions", "value": "by_negative"},
                                                 {"label": "All Types", "value": "all"}
                                             ],
                                             value="all",
@@ -997,9 +1043,9 @@ main_layout = dbc.Container(
                                                 dbc.RadioItems(
                                                     id="type-filter-radio-heatmap-b",
                                                     options=[
-                                                        {"label": "By Name", "value": "by_name"},
-                                                        {"label": "By Positive", "value": "by_positive"},
-                                                        {"label": "By Negative", "value": "by_negative"},
+                                                        {"label": "Annotated metabolites", "value": "by_name"},
+                                                        {"label": "Positive ions", "value": "by_positive"},
+                                                        {"label": "Negative ions", "value": "by_negative"},
                                                         {"label": "All Types", "value": "all"}
                                                     ],
                                                     value="all",
@@ -1097,9 +1143,9 @@ main_layout = dbc.Container(
                                                             dbc.RadioItems(
                                                                 id="type-filter-radio-top-a",
                                                                 options=[
-                                                                    {"label": "By Name", "value": "by_name"},
-                                                                    {"label": "By Positive", "value": "by_positive"},
-                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "Annotated metabolites", "value": "by_name"},
+                                                                    {"label": "Positive ions", "value": "by_positive"},
+                                                                    {"label": "Negative ions", "value": "by_negative"},
                                                                     {"label": "All Types", "value": "all"}
                                                                 ],
                                                                 value="all",
@@ -1160,9 +1206,9 @@ main_layout = dbc.Container(
                                                             dbc.RadioItems(
                                                                 id="type-filter-radio-top-b",
                                                                 options=[
-                                                                    {"label": "By Name", "value": "by_name"},
-                                                                    {"label": "By Positive", "value": "by_positive"},
-                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "Annotated metabolites", "value": "by_name"},
+                                                                    {"label": "Positive ions", "value": "by_positive"},
+                                                                    {"label": "Negative ions", "value": "by_negative"},
                                                                     {"label": "All Types", "value": "all"}
                                                                 ],
                                                                 value="all",
@@ -1217,10 +1263,21 @@ main_layout = dbc.Container(
                 html.Div(
                     className="section-spacing",
                     children=[
-                        html.H2("Cumulative Top Metabolites", className="section-heading"),
-                        html.P(
-                            "Analyze cumulative metabolite production patterns across selected bacteria.",
+                        html.H2("Metabolic Co-Occurrence Analysis", className="section-heading", id="section3"),
+                        html.H3(
+                            "Top Producer Consortia",
+                            className="section-subheading",
+                        ),
+                        html.Div(
                             className="section-description",
+                            children=[
+                                html.P(
+                                    "This section identifies groups of microbial species that frequently co-occur as the top 10 producers across multiple metabolites. By analyzing these shared patterns of metabolic dominance, users can uncover functional similarities and identify metabolic clusters that consistently drive high-level production across the entire set of analyzed strains."
+                                ),
+                                html.P(
+                                    "Use the selectors below to explore co-occurrence patterns among specific strains—including pairs, triplets, quadruplets, or larger combinations—to determine which groups frequently appear together as primary metabolic contributors."
+                                ),
+                            ],
                         ),
                         
                         dcc.Tabs([
@@ -1239,9 +1296,9 @@ main_layout = dbc.Container(
                                                             dbc.RadioItems(
                                                                 id="type-filter-radio-cum-a",
                                                                 options=[
-                                                                    {"label": "By Name", "value": "by_name"},
-                                                                    {"label": "By Positive", "value": "by_positive"},
-                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "Annotated metabolites", "value": "by_name"},
+                                                                    {"label": "Positive ions", "value": "by_positive"},
+                                                                    {"label": "Negative ions", "value": "by_negative"},
                                                                     {"label": "All Types", "value": "all"}
                                                                 ],
                                                                 value="all",
@@ -1302,9 +1359,9 @@ main_layout = dbc.Container(
                                                             dbc.RadioItems(
                                                                 id="type-filter-radio-cum-b",
                                                                 options=[
-                                                                    {"label": "By Name", "value": "by_name"},
-                                                                    {"label": "By Positive", "value": "by_positive"},
-                                                                    {"label": "By Negative", "value": "by_negative"},
+                                                                    {"label": "Annotated metabolites", "value": "by_name"},
+                                                                    {"label": "Positive ions", "value": "by_positive"},
+                                                                    {"label": "Negative ions", "value": "by_negative"},
                                                                     {"label": "All Types", "value": "all"}
                                                                 ],
                                                                 value="all",
