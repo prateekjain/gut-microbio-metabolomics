@@ -403,7 +403,7 @@ def register_callbacks(app):
                 height=600,
                 autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
-                    tickangle=90,
+                    tickangle=45,
                     tickfont=dict(size=max(8, min(14, 120 // len(x_axis.unique())))),
                     automargin=True,
                     ticks='outside',
@@ -550,7 +550,7 @@ def register_callbacks(app):
                 height=600,
                 autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
-                    tickangle=90,
+                    tickangle=45,
                     tickfont=dict(size=max(8, min(14, 120 // len(x_axis.unique())))),
                     automargin=True,
                     ticks='outside',
@@ -734,7 +734,7 @@ def register_callbacks(app):
                 height=600,
                 autosize=False,  # Disable autosize to maintain width for scrolling
                 xaxis=dict(
-                    tickangle=90,
+                    tickangle=45,
                     tickfont=dict(size=max(8, min(14, 120 // len(x_axis.unique())))),
                     automargin=True,
                     ticks='outside',
